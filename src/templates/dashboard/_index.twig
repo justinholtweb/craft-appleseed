@@ -1,0 +1,159 @@
+{% extends "_layouts/cp" %}
+
+{% set title = 'Appleseed' %}
+{% set selectedSubnavItem = 'dashboard' %}
+
+{% do view.registerAssetBundle("justinholtweb\\appleseed\\assets\\AppleseedAsset") %}
+
+{% block content %}
+
+{# Summary Cards #}
+<div class="appleseed-summary-cards">
+    <div class="appleseed-card appleseed-card--total">
+        <div class="appleseed-card__number">{{ summary.total }}</div>
+        <div class="appleseed-card__label">Total Links</div>
+    </div>
+    <div class="appleseed-card appleseed-card--broken">
+        <div class="appleseed-card__number">{{ summary.broken }}</div>
+        <div class="appleseed-card__label">Broken</div>
+    </div>
+    <div class="appleseed-card appleseed-card--redirect">
+        <div class="appleseed-card__number">{{ summary.redirects }}</div>
+        <div class="appleseed-card__label">Redirects</div>
+    </div>
+    <div class="appleseed-card appleseed-card--working">
+        <div class="appleseed-card__number">{{ summary.working }}</div>
+        <div class="appleseed-card__label">Working</div>
+    </div>
+</div>
+
+{# Scan Controls #}
+<div class="appleseed-controls">
+    <div class="appleseed-controls__left">
+        <button type="button" class="btn submit" id="appleseed-run-scan">Run Scan</button>
+        <a href="{{ actionUrl('appleseed/dashboard/export-csv', { status: statusFilter }) }}" class="btn">Export CSV</a>
+    </div>
+
+    <div class="appleseed-controls__right">
+        {% if lastScan %}
+            <span class="appleseed-last-scan">
+                Last scan: {{ lastScan.completedAt|date('M j, Y g:ia') }}
+                &mdash; {{ lastScan.brokenCount }} broken
+            </span>
+        {% endif %}
+    </div>
+</div>
+
+{# Scan Progress Bar (hidden by default) #}
+<div class="appleseed-progress" id="appleseed-progress" style="display: none;">
+    <div class="appleseed-progress__bar">
+        <div class="appleseed-progress__fill" id="appleseed-progress-fill"></div>
+    </div>
+    <div class="appleseed-progress__text" id="appleseed-progress-text">Scanning...</div>
+</div>
+
+{# Filters #}
+<div class="appleseed-filters">
+    <form method="get" action="{{ cpUrl('appleseed/dashboard') }}">
+        <div class="appleseed-filters__row">
+            <div class="select">
+                <select name="status" onchange="this.form.submit()">
+                    <option value="">All Statuses</option>
+                    <option value="broken" {{ statusFilter == 'broken' ? 'selected' }}>Broken</option>
+                    <option value="redirect" {{ statusFilter == 'redirect' ? 'selected' }}>Redirect</option>
+                    <option value="working" {{ statusFilter == 'working' ? 'selected' }}>Working</option>
+                    <option value="server_error" {{ statusFilter == 'server_error' ? 'selected' }}>Server Error</option>
+                    <option value="timeout" {{ statusFilter == 'timeout' ? 'selected' }}>Timeout</option>
+                    <option value="dns_error" {{ statusFilter == 'dns_error' ? 'selected' }}>DNS Error</option>
+                </select>
+            </div>
+
+            <div class="flex-grow texticon search icon clearable">
+                <input type="text" name="search" class="text fullwidth" placeholder="Search URLs..." value="{{ search }}" autocomplete="off">
+                {% if search %}<button class="clear-btn" title="Clear" aria-label="Clear"></button>{% endif %}
+            </div>
+        </div>
+    </form>
+</div>
+
+{# Results Table #}
+{% if results.links|length %}
+    <div class="appleseed-table-wrap">
+        <table class="data fullwidth appleseed-table">
+            <thead>
+                <tr>
+                    <th>URL</th>
+                    <th>Status</th>
+                    <th>Code</th>
+                    <th>Source</th>
+                    <th>Field</th>
+                    <th>Link Text</th>
+                    <th>Last Checked</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for link in results.links %}
+                    <tr data-link-id="{{ link.id }}">
+                        <td class="appleseed-url-cell">
+                            <a href="{{ cpUrl('appleseed/dashboard/detail/' ~ link.id) }}" title="{{ link.url }}">
+                                {{ link.url|length > 60 ? link.url[:60] ~ '...' : link.url }}
+                            </a>
+                        </td>
+                        <td>
+                            <span class="appleseed-status appleseed-status--{{ link.status }}">
+                                {{ link.status|replace({'_': ' '})|title }}
+                            </span>
+                        </td>
+                        <td>{{ link.statusCode ?? '—' }}</td>
+                        <td>
+                            {% if link.sources|length %}
+                                {% set source = link.sources[0] %}
+                                {% if source.entryCpUrl is defined and source.entryCpUrl %}
+                                    <a href="{{ source.entryCpUrl }}">{{ source.entryTitle ?? 'Entry #' ~ source.entryId }}</a>
+                                {% elseif source.sourceUrl is defined and source.sourceUrl %}
+                                    {{ source.sourceUrl|length > 40 ? source.sourceUrl[:40] ~ '...' : source.sourceUrl }}
+                                {% endif %}
+                                {% if link.sources|length > 1 %}
+                                    <span class="appleseed-more">+{{ link.sources|length - 1 }} more</span>
+                                {% endif %}
+                            {% endif %}
+                        </td>
+                        <td>{{ link.sources[0].fieldHandle ?? '—' }}</td>
+                        <td>{{ link.sources[0].linkText ?? '—' }}</td>
+                        <td>{{ link.lastCheckedAt ? link.lastCheckedAt|date('M j g:ia') : 'Never' }}</td>
+                        <td class="thin">
+                            <div class="appleseed-actions">
+                                <button type="button" class="btn small appleseed-rescan-btn" data-link-id="{{ link.id }}" title="Re-check">↻</button>
+                                <button type="button" class="btn small appleseed-ignore-btn" data-link-id="{{ link.id }}" title="Ignore">✕</button>
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {# Pagination #}
+    {% if results.totalPages > 1 %}
+        <nav class="appleseed-pagination">
+            {% for p in 1..results.totalPages %}
+                {% if p == page %}
+                    <span class="appleseed-pagination__current">{{ p }}</span>
+                {% else %}
+                    <a href="{{ cpUrl('appleseed/dashboard', { status: statusFilter, search: search, page: p }) }}">{{ p }}</a>
+                {% endif %}
+            {% endfor %}
+        </nav>
+    {% endif %}
+{% else %}
+    <div class="zilch">
+        {% if statusFilter or search %}
+            No links match your filters.
+        {% else %}
+            No links found yet. Run a scan to discover links across your site.
+        {% endif %}
+    </div>
+{% endif %}
+
+{% endblock %}

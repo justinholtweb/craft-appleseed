@@ -1,0 +1,102 @@
+{% extends "_layouts/cp" %}
+
+{% set title = 'Link Detail' %}
+{% set selectedSubnavItem = 'dashboard' %}
+
+{% do view.registerAssetBundle("justinholtweb\\appleseed\\assets\\AppleseedAsset") %}
+
+{% block content %}
+
+<div class="appleseed-detail">
+    <div class="appleseed-detail__header">
+        <h2 class="appleseed-detail__url">
+            <a href="{{ link.url }}" target="_blank" rel="noopener noreferrer">{{ link.url }}</a>
+        </h2>
+
+        <div class="appleseed-detail__meta">
+            <span class="appleseed-status appleseed-status--{{ link.status }}">
+                {{ link.status|replace({'_': ' '})|title }}
+            </span>
+
+            {% if link.statusCode %}
+                <span class="appleseed-detail__code">HTTP {{ link.statusCode }}</span>
+            {% endif %}
+
+            {% if link.lastCheckedAt %}
+                <span class="appleseed-detail__checked">Last checked: {{ link.lastCheckedAt|date('M j, Y g:ia') }}</span>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if link.errorMessage %}
+        <div class="appleseed-detail__error">
+            <strong>Error:</strong> {{ link.errorMessage }}
+        </div>
+    {% endif %}
+
+    {% if link.redirectUrl %}
+        <div class="appleseed-detail__redirect">
+            <strong>Redirects to:</strong>
+            <a href="{{ link.redirectUrl }}" target="_blank" rel="noopener noreferrer">{{ link.redirectUrl }}</a>
+        </div>
+    {% endif %}
+
+    {% if link.redirectChain %}
+        <div class="appleseed-detail__chain">
+            <strong>Redirect chain:</strong>
+            <ol>
+                {% for hop in link.redirectChain %}
+                    <li>{{ hop }}</li>
+                {% endfor %}
+            </ol>
+        </div>
+    {% endif %}
+
+    <div class="appleseed-detail__actions">
+        <button type="button" class="btn submit appleseed-rescan-btn" data-link-id="{{ link.id }}">Re-check Link</button>
+        {% if link.isIgnored %}
+            <button type="button" class="btn appleseed-unignore-btn" data-link-id="{{ link.id }}">Un-ignore</button>
+        {% else %}
+            <button type="button" class="btn appleseed-ignore-btn" data-link-id="{{ link.id }}">Ignore Link</button>
+        {% endif %}
+    </div>
+
+    <hr>
+
+    <h3>Found in {{ link.sources|length }} location{{ link.sources|length != 1 ? 's' }}</h3>
+
+    {% if link.sources|length %}
+        <table class="data fullwidth appleseed-table">
+            <thead>
+                <tr>
+                    <th>Source</th>
+                    <th>Type</th>
+                    <th>Field</th>
+                    <th>Link Text</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for source in link.sources %}
+                    <tr>
+                        <td>
+                            {% if source.entryCpUrl is defined and source.entryCpUrl %}
+                                <a href="{{ source.entryCpUrl }}">{{ source.entryTitle ?? 'Entry #' ~ source.entryId }}</a>
+                            {% elseif source.sourceUrl %}
+                                <a href="{{ source.sourceUrl }}" target="_blank" rel="noopener noreferrer">{{ source.sourceUrl }}</a>
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="appleseed-source-type">{{ source.sourceType }}</span>
+                        </td>
+                        <td>{{ source.fieldHandle ?? '—' }}</td>
+                        <td>{{ source.linkText ?? '—' }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+</div>
+
+{% endblock %}

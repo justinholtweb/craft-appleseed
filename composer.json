@@ -1,0 +1,38 @@
+{
+    "name": "justinholtweb/craft-appleseed",
+    "description": "Broken link checker for Craft CMS 5",
+    "type": "craft-plugin",
+    "license": "MIT",
+    "keywords": [
+        "craftcms",
+        "broken-links",
+        "link-checker",
+        "seo"
+    ],
+    "support": {
+        "issues": "https://github.com/justinholtweb/craft-appleseed/issues"
+    },
+    "require": {
+        "php": "^8.2",
+        "craftcms/cms": "^5.0.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "justinholtweb\\appleseed\\": "src/"
+        }
+    },
+    "extra": {
+        "handle": "appleseed",
+        "name": "Appleseed",
+        "developer": "Justin Holt",
+        "developerUrl": "https://justinholtweb.com",
+        "documentationUrl": "https://github.com/justinholtweb/craft-appleseed/blob/main/README.md",
+        "class": "justinholtweb\\appleseed\\Plugin"
+    },
+    "config": {
+        "allow-plugins": {
+            "yiisoft/yii2-composer": true,
+            "craftcms/plugin-installer": true
+        }
+    }
+}

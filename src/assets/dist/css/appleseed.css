@@ -1,0 +1,283 @@
+/* Summary Cards */
+.appleseed-summary-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.appleseed-card {
+    background: #fff;
+    border: 1px solid #e5e5e5;
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+}
+
+.appleseed-card__number {
+    font-size: 32px;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 4px;
+}
+
+.appleseed-card__label {
+    font-size: 13px;
+    color: #8f98a3;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.appleseed-card--broken .appleseed-card__number { color: #dc2626; }
+.appleseed-card--broken { border-color: #fca5a5; background: #fef2f2; }
+
+.appleseed-card--redirect .appleseed-card__number { color: #d97706; }
+.appleseed-card--redirect { border-color: #fcd34d; background: #fffbeb; }
+
+.appleseed-card--working .appleseed-card__number { color: #16a34a; }
+.appleseed-card--working { border-color: #86efac; background: #f0fdf4; }
+
+/* Controls row */
+.appleseed-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.appleseed-controls__left {
+    display: flex;
+    gap: 8px;
+}
+
+.appleseed-last-scan {
+    font-size: 13px;
+    color: #8f98a3;
+}
+
+/* Progress bar */
+.appleseed-progress {
+    margin-bottom: 16px;
+    padding: 12px;
+    background: #f0f4f8;
+    border-radius: 6px;
+}
+
+.appleseed-progress__bar {
+    height: 8px;
+    background: #e2e8f0;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 6px;
+}
+
+.appleseed-progress__fill {
+    height: 100%;
+    background: #3b82f6;
+    border-radius: 4px;
+    transition: width 0.3s ease;
+    width: 0;
+}
+
+.appleseed-progress__text {
+    font-size: 13px;
+    color: #64748b;
+}
+
+/* Filters */
+.appleseed-filters {
+    margin-bottom: 16px;
+}
+
+.appleseed-filters__row {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+.appleseed-filters__row .texticon {
+    flex: 1;
+}
+
+/* Table */
+.appleseed-table-wrap {
+    overflow-x: auto;
+    margin-bottom: 16px;
+}
+
+.appleseed-table {
+    font-size: 13px;
+}
+
+.appleseed-url-cell {
+    max-width: 300px;
+    word-break: break-all;
+}
+
+.appleseed-url-cell a {
+    color: #2563eb;
+    text-decoration: none;
+}
+
+.appleseed-url-cell a:hover {
+    text-decoration: underline;
+}
+
+/* Status badges */
+.appleseed-status {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.appleseed-status--working {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.appleseed-status--redirect {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.appleseed-status--broken,
+.appleseed-status--dns_error,
+.appleseed-status--timeout {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.appleseed-status--server_error {
+    background: #fde8e8;
+    color: #9b1c1c;
+}
+
+.appleseed-status--unknown {
+    background: #f3f4f6;
+    color: #6b7280;
+}
+
+.appleseed-status--ignored {
+    background: #e5e7eb;
+    color: #6b7280;
+}
+
+.appleseed-more {
+    display: inline-block;
+    margin-left: 4px;
+    font-size: 11px;
+    color: #8f98a3;
+}
+
+/* Row actions */
+.appleseed-actions {
+    display: flex;
+    gap: 4px;
+    white-space: nowrap;
+}
+
+/* Pagination */
+.appleseed-pagination {
+    display: flex;
+    gap: 4px;
+    justify-content: center;
+    padding: 12px 0;
+}
+
+.appleseed-pagination a,
+.appleseed-pagination__current {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 13px;
+    text-decoration: none;
+}
+
+.appleseed-pagination a {
+    color: #2563eb;
+    background: #f0f4f8;
+}
+
+.appleseed-pagination a:hover {
+    background: #e2e8f0;
+}
+
+.appleseed-pagination__current {
+    background: #3b82f6;
+    color: #fff;
+}
+
+/* Detail page */
+.appleseed-detail__header {
+    margin-bottom: 20px;
+}
+
+.appleseed-detail__url {
+    font-size: 16px;
+    word-break: break-all;
+    margin-bottom: 8px;
+}
+
+.appleseed-detail__url a {
+    color: #2563eb;
+    text-decoration: none;
+}
+
+.appleseed-detail__meta {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.appleseed-detail__code,
+.appleseed-detail__checked {
+    font-size: 13px;
+    color: #8f98a3;
+}
+
+.appleseed-detail__error {
+    background: #fef2f2;
+    border: 1px solid #fca5a5;
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 16px;
+    font-size: 13px;
+    color: #991b1b;
+}
+
+.appleseed-detail__redirect,
+.appleseed-detail__chain {
+    background: #fffbeb;
+    border: 1px solid #fcd34d;
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 16px;
+    font-size: 13px;
+}
+
+.appleseed-detail__chain ol {
+    margin: 8px 0 0;
+    padding-left: 20px;
+}
+
+.appleseed-detail__actions {
+    display: flex;
+    gap: 8px;
+    margin: 16px 0;
+}
+
+.appleseed-source-type {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 11px;
+    background: #f3f4f6;
+    color: #6b7280;
+    text-transform: uppercase;
+}
