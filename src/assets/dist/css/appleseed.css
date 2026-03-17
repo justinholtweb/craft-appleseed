@@ -29,13 +29,13 @@
 }
 
 .appleseed-card--broken .appleseed-card__number { color: #dc2626; }
-.appleseed-card--broken { border-color: #fca5a5; background: #fef2f2; }
+.appleseed-card--broken { border-color: #dc2626; background: #fff; }
 
 .appleseed-card--redirect .appleseed-card__number { color: #d97706; }
-.appleseed-card--redirect { border-color: #fcd34d; background: #fffbeb; }
+.appleseed-card--redirect { border-color: #d97706; background: #fff; }
 
 .appleseed-card--working .appleseed-card__number { color: #16a34a; }
-.appleseed-card--working { border-color: #86efac; background: #f0fdf4; }
+.appleseed-card--working { border-color: #16a34a; background: #fff; }
 
 /* Controls row */
 .appleseed-controls {
@@ -280,4 +280,115 @@
     background: #f3f4f6;
     color: #6b7280;
     text-transform: uppercase;
+}
+
+/* Source section label */
+.appleseed-source-section {
+    font-size: 11px;
+    margin-top: 2px;
+}
+
+/* Entry status badges */
+.appleseed-entry-status {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: capitalize;
+}
+
+.appleseed-entry-status--live {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.appleseed-entry-status--disabled {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.appleseed-entry-status--deleted {
+    background: #f3f4f6;
+    color: #6b7280;
+    font-style: italic;
+}
+
+.appleseed-entry-status--pending,
+.appleseed-entry-status--expired {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+/* Link text cell */
+.appleseed-linktext-cell {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Section picker */
+.appleseed-section-picker {
+    background: #fff;
+    border: 1px solid #e5e5e5;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 16px;
+}
+
+.appleseed-section-picker__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.appleseed-section-picker__header h3 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.appleseed-section-picker__select-all {
+    font-size: 12px;
+}
+
+.appleseed-section-picker__select-all a {
+    color: #2563eb;
+    text-decoration: none;
+}
+
+.appleseed-section-picker__select-all a:hover {
+    text-decoration: underline;
+}
+
+.appleseed-section-picker__groups {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.appleseed-section-picker__group h4 {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #8f98a3;
+    margin: 0 0 8px;
+}
+
+.appleseed-section-picker__item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    padding: 3px 0;
+    cursor: pointer;
+}
+
+.appleseed-section-picker__actions {
+    display: flex;
+    gap: 8px;
 }

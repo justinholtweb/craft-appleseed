@@ -92,7 +92,7 @@ class Plugin extends BasePlugin
 
     protected function settingsHtml(): ?string
     {
-        return Craft::$app->getView()->renderTemplate('appleseed/settings/_index', [
+        return Craft::$app->getView()->renderTemplate('appleseed/settings/_fields', [
             'settings' => $this->getSettings(),
         ]);
     }
@@ -107,6 +107,7 @@ class Plugin extends BasePlugin
                 $event->rules['appleseed/dashboard'] = 'appleseed/dashboard/index';
                 $event->rules['appleseed/dashboard/detail/<linkId:\d+>'] = 'appleseed/dashboard/detail';
                 $event->rules['appleseed/settings'] = 'appleseed/settings/index';
+                $event->rules['appleseed/preview-email'] = 'appleseed/dashboard/preview-email';
             }
         );
     }

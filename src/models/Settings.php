@@ -3,6 +3,8 @@
 namespace justinholtweb\appleseed\models;
 
 use craft\base\Model;
+use craft\behaviors\EnvAttributeParserBehavior;
+use craft\helpers\App;
 
 class Settings extends Model
 {
@@ -18,6 +20,36 @@ class Settings extends Model
     public int $notificationThreshold = 1;
     public string $ignorePatterns = '';
     public string $userAgent = 'Appleseed Link Checker (Craft CMS)';
+    public string $emailLayoutTemplate = '';
+
+    public function behaviors(): array
+    {
+        return [
+            'parser' => [
+                'class' => EnvAttributeParserBehavior::class,
+                'attributes' => [
+                    'notificationEmails',
+                    'userAgent',
+                    'emailLayoutTemplate',
+                ],
+            ],
+        ];
+    }
+
+    public function getNotificationEmailsParsed(): string
+    {
+        return App::parseEnv($this->notificationEmails);
+    }
+
+    public function getUserAgentParsed(): string
+    {
+        return App::parseEnv($this->userAgent);
+    }
+
+    public function getEmailLayoutTemplateParsed(): string
+    {
+        return App::parseEnv($this->emailLayoutTemplate);
+    }
 
     protected function defineRules(): array
     {
@@ -26,7 +58,7 @@ class Settings extends Model
             [['rateLimitPerSecond'], 'number', 'min' => 0.1, 'max' => 100],
             [['scanFrequency'], 'in', 'range' => ['manual', 'daily', 'weekly', 'monthly']],
             [['checkExternalLinks', 'spiderEnabled', 'scanOnEntrySave'], 'boolean'],
-            [['notificationEmails', 'ignorePatterns', 'userAgent'], 'string'],
+            [['notificationEmails', 'ignorePatterns', 'userAgent', 'emailLayoutTemplate'], 'string'],
             [['timeout'], 'integer', 'max' => 60],
             [['maxRetries'], 'integer', 'max' => 10],
             [['maxPagesToSpider'], 'integer', 'max' => 10000],
@@ -53,12 +85,14 @@ class Settings extends Model
      */
     public function getNotificationEmailsArray(): array
     {
-        if (empty($this->notificationEmails)) {
+        $parsed = $this->getNotificationEmailsParsed();
+
+        if (empty($parsed)) {
             return [];
         }
 
         return array_filter(
-            array_map('trim', explode(',', $this->notificationEmails)),
+            array_map('trim', explode(',', $parsed)),
             fn(string $email) => $email !== '',
         );
     }

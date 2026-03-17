@@ -22,9 +22,10 @@ class LinkExtractor extends Component
     /**
      * Extract all links from all entries across all sites.
      *
+     * @param int[]|null $sectionIds Optional section IDs to limit extraction to.
      * @return array<array{url: string, entryId: int, siteId: int, fieldHandle: string, linkText: string|null}>
      */
-    public function extractAllLinks(?callable $progressCallback = null): array
+    public function extractAllLinks(?callable $progressCallback = null, ?array $sectionIds = null): array
     {
         $this->_links = [];
 
@@ -36,6 +37,10 @@ class LinkExtractor extends Component
                 ->siteId($site->id)
                 ->status('live')
                 ->limit(null);
+
+            if (!empty($sectionIds)) {
+                $query->sectionId($sectionIds);
+            }
 
             $totalEntries = $query->count();
             $offset = 0;

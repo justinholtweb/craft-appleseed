@@ -70,6 +70,8 @@
             <thead>
                 <tr>
                     <th>Source</th>
+                    <th>Section</th>
+                    <th>Entry Status</th>
                     <th>Type</th>
                     <th>Field</th>
                     <th>Link Text</th>
@@ -83,6 +85,14 @@
                                 <a href="{{ source.entryCpUrl }}">{{ source.entryTitle ?? 'Entry #' ~ source.entryId }}</a>
                             {% elseif source.sourceUrl %}
                                 <a href="{{ source.sourceUrl }}" target="_blank" rel="noopener noreferrer">{{ source.sourceUrl }}</a>
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                        <td>{{ source.entrySection ?? '—' }}</td>
+                        <td>
+                            {% if source.entryStatus is defined and source.entryStatus %}
+                                <span class="appleseed-entry-status appleseed-entry-status--{{ source.entryStatus }}">{{ source.entryStatus|title }}</span>
                             {% else %}
                                 —
                             {% endif %}

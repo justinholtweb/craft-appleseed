@@ -3,6 +3,7 @@
 namespace justinholtweb\appleseed\controllers;
 
 use Craft;
+use craft\models\Section;
 use craft\web\Controller;
 use justinholtweb\appleseed\jobs\CheckLinksJob;
 use justinholtweb\appleseed\jobs\ScanJob;
@@ -42,6 +43,9 @@ class DashboardController extends Controller
 
         $results = $plugin->reporting->getLinkResults($statusFilter, $search, $page, 50, $sort, $direction);
 
+        // Group sections by type for scan scope picker
+        $sectionsByType = $this->_getSectionsByType();
+
         return $this->renderTemplate('appleseed/dashboard/_index', [
             'summary' => $summary,
             'results' => $results,
@@ -52,7 +56,30 @@ class DashboardController extends Controller
             'sort' => $sort,
             'direction' => $direction,
             'page' => $page,
+            'sectionsByType' => $sectionsByType,
         ]);
+    }
+
+    /**
+     * Preview the scan report email in the browser.
+     */
+    public function actionPreviewEmail(): Response
+    {
+        $plugin = Plugin::getInstance();
+        $scan = $plugin->reporting->getLastCompletedScan();
+
+        if (!$scan) {
+            Craft::$app->getSession()->setError('No completed scan found to preview.');
+            return $this->redirect('appleseed/dashboard');
+        }
+
+        $html = $plugin->reporting->renderScanReportEmail($scan);
+
+        $response = Craft::$app->getResponse();
+        $response->format = \yii\web\Response::FORMAT_HTML;
+        $response->content = $html;
+
+        return $response;
     }
 
     /**
@@ -73,7 +100,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * Start a full scan (AJAX).
+     * Start a scan (AJAX). Optionally scoped to specific sections.
      */
     public function actionRunScan(): Response
     {
@@ -81,7 +108,14 @@ class DashboardController extends Controller
         $this->requirePostRequest();
         $this->requireAcceptsJson();
 
-        Craft::$app->getQueue()->push(new ScanJob());
+        $sectionIds = Craft::$app->getRequest()->getBodyParam('sectionIds');
+
+        $job = new ScanJob();
+        if (!empty($sectionIds) && is_array($sectionIds)) {
+            $job->sectionIds = array_map('intval', $sectionIds);
+        }
+
+        Craft::$app->getQueue()->push($job);
 
         return $this->asJson(['success' => true, 'message' => 'Scan queued']);
     }
@@ -205,5 +239,34 @@ class DashboardController extends Controller
         $response->content = $csv;
 
         return $response;
+    }
+
+    /**
+     * Get all sections grouped by type for the scan scope picker.
+     *
+     * @return array<string, array<array{id: int, name: string}>>
+     */
+    private function _getSectionsByType(): array
+    {
+        $sections = Craft::$app->getEntries()->getAllSections();
+        $grouped = [];
+
+        foreach ($sections as $section) {
+            $type = is_string($section->type) ? $section->type : $section->type->value;
+            $grouped[$type][] = [
+                'id' => $section->id,
+                'name' => $section->name,
+            ];
+        }
+
+        // Sort by display order: singles, channels, structures
+        $ordered = [];
+        foreach (['single', 'channel', 'structure'] as $type) {
+            if (isset($grouped[$type])) {
+                $ordered[$type] = $grouped[$type];
+            }
+        }
+
+        return $ordered;
     }
 }

@@ -9,6 +9,9 @@ class ScanJob extends BaseJob
 {
     public string $type = 'full';
 
+    /** @var int[]|null */
+    public ?array $sectionIds = null;
+
     public function execute($queue): void
     {
         $plugin = Plugin::getInstance();
@@ -17,7 +20,9 @@ class ScanJob extends BaseJob
             $this->setProgress($queue, $progress, $message);
         };
 
-        if ($this->type === 'database') {
+        if (!empty($this->sectionIds)) {
+            $plugin->scanner->runSectionScan($this->sectionIds, $progressCallback);
+        } elseif ($this->type === 'database') {
             $plugin->scanner->runDatabaseScan($progressCallback);
         } else {
             $plugin->scanner->runFullScan($progressCallback);
@@ -26,6 +31,10 @@ class ScanJob extends BaseJob
 
     protected function defaultDescription(): ?string
     {
+        if (!empty($this->sectionIds)) {
+            return 'Appleseed: Scanning selected sections for broken links';
+        }
+
         return 'Appleseed: Scanning for broken links';
     }
 }

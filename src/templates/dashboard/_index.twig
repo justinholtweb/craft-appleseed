@@ -7,6 +7,10 @@
 
 {% block content %}
 
+{% if runningScan %}
+<div id="appleseed-scan-active" data-running="1" style="display:none"></div>
+{% endif %}
+
 {# Summary Cards #}
 <div class="appleseed-summary-cards">
     <div class="appleseed-card appleseed-card--total">
@@ -30,7 +34,8 @@
 {# Scan Controls #}
 <div class="appleseed-controls">
     <div class="appleseed-controls__left">
-        <button type="button" class="btn submit" id="appleseed-run-scan">Run Scan</button>
+        <button type="button" class="btn submit" id="appleseed-run-scan">Run Full Scan</button>
+        <button type="button" class="btn" id="appleseed-scan-sections-toggle">Scan Sections...</button>
         <a href="{{ actionUrl('appleseed/dashboard/export-csv', { status: statusFilter }) }}" class="btn">Export CSV</a>
     </div>
 
@@ -41,6 +46,40 @@
                 &mdash; {{ lastScan.brokenCount }} broken
             </span>
         {% endif %}
+    </div>
+</div>
+
+{# Section Scope Picker #}
+<div class="appleseed-section-picker" id="appleseed-section-picker" style="display: none;">
+    <div class="appleseed-section-picker__inner">
+        <div class="appleseed-section-picker__header">
+            <h3>Select sections to scan</h3>
+            <div class="appleseed-section-picker__select-all">
+                <a href="#" id="appleseed-select-all">Select all</a> /
+                <a href="#" id="appleseed-select-none">Select none</a>
+            </div>
+        </div>
+
+        <div class="appleseed-section-picker__groups">
+            {% set typeLabels = { single: 'Singles', channel: 'Channels', structure: 'Structures' } %}
+
+            {% for type, sections in sectionsByType %}
+                <div class="appleseed-section-picker__group">
+                    <h4>{{ typeLabels[type] ?? type|title }}</h4>
+                    {% for section in sections %}
+                        <label class="appleseed-section-picker__item">
+                            <input type="checkbox" name="sectionIds[]" value="{{ section.id }}" class="appleseed-section-checkbox">
+                            {{ section.name }}
+                        </label>
+                    {% endfor %}
+                </div>
+            {% endfor %}
+        </div>
+
+        <div class="appleseed-section-picker__actions">
+            <button type="button" class="btn submit" id="appleseed-run-section-scan">Scan Selected Sections</button>
+            <button type="button" class="btn" id="appleseed-section-picker-cancel">Cancel</button>
+        </div>
     </div>
 </div>
 
@@ -111,8 +150,14 @@
                                 {% set source = link.sources[0] %}
                                 {% if source.entryCpUrl is defined and source.entryCpUrl %}
                                     <a href="{{ source.entryCpUrl }}">{{ source.entryTitle ?? 'Entry #' ~ source.entryId }}</a>
+                                    {% if source.entrySection is defined and source.entrySection %}
+                                        <div class="appleseed-source-section light">{{ source.entrySection }}</div>
+                                    {% endif %}
                                 {% elseif source.sourceUrl is defined and source.sourceUrl %}
                                     {{ source.sourceUrl|length > 40 ? source.sourceUrl[:40] ~ '...' : source.sourceUrl }}
+                                {% endif %}
+                                {% if source.entryStatus is defined and source.entryStatus != 'live' %}
+                                    <span class="appleseed-entry-status appleseed-entry-status--{{ source.entryStatus }}">{{ source.entryStatus }}</span>
                                 {% endif %}
                                 {% if link.sources|length > 1 %}
                                     <span class="appleseed-more">+{{ link.sources|length - 1 }} more</span>
@@ -120,7 +165,7 @@
                             {% endif %}
                         </td>
                         <td>{{ link.sources[0].fieldHandle ?? '—' }}</td>
-                        <td>{{ link.sources[0].linkText ?? '—' }}</td>
+                        <td class="appleseed-linktext-cell">{{ link.sources[0].linkText ?? '—' }}</td>
                         <td>{{ link.lastCheckedAt ? link.lastCheckedAt|date('M j g:ia') : 'Never' }}</td>
                         <td class="thin">
                             <div class="appleseed-actions">

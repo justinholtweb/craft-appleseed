@@ -1,7 +1,9 @@
 (function () {
     'use strict';
 
-    // Run Scan button
+    document.addEventListener('DOMContentLoaded', function () {
+
+    // Run Full Scan button
     var runScanBtn = document.getElementById('appleseed-run-scan');
     if (runScanBtn) {
         runScanBtn.addEventListener('click', function () {
@@ -15,7 +17,75 @@
                 })
                 .catch(function (error) {
                     runScanBtn.disabled = false;
-                    runScanBtn.textContent = 'Run Scan';
+                    runScanBtn.textContent = 'Run Full Scan';
+                    Craft.cp.displayError('Failed to start scan');
+                    console.error('Appleseed scan error:', error);
+                });
+        });
+    }
+
+    // Section picker toggle
+    var sectionPickerToggle = document.getElementById('appleseed-scan-sections-toggle');
+    var sectionPicker = document.getElementById('appleseed-section-picker');
+    var sectionPickerCancel = document.getElementById('appleseed-section-picker-cancel');
+
+    if (sectionPickerToggle && sectionPicker) {
+        sectionPickerToggle.addEventListener('click', function () {
+            sectionPicker.style.display = sectionPicker.style.display === 'none' ? 'block' : 'none';
+        });
+
+        if (sectionPickerCancel) {
+            sectionPickerCancel.addEventListener('click', function () {
+                sectionPicker.style.display = 'none';
+            });
+        }
+    }
+
+    // Select all / Select none
+    var selectAll = document.getElementById('appleseed-select-all');
+    var selectNone = document.getElementById('appleseed-select-none');
+
+    if (selectAll) {
+        selectAll.addEventListener('click', function (e) {
+            e.preventDefault();
+            document.querySelectorAll('.appleseed-section-checkbox').forEach(function (cb) { cb.checked = true; });
+        });
+    }
+
+    if (selectNone) {
+        selectNone.addEventListener('click', function (e) {
+            e.preventDefault();
+            document.querySelectorAll('.appleseed-section-checkbox').forEach(function (cb) { cb.checked = false; });
+        });
+    }
+
+    // Run Section Scan button
+    var runSectionScanBtn = document.getElementById('appleseed-run-section-scan');
+    if (runSectionScanBtn) {
+        runSectionScanBtn.addEventListener('click', function () {
+            var checked = document.querySelectorAll('.appleseed-section-checkbox:checked');
+            if (checked.length === 0) {
+                Craft.cp.displayError('Please select at least one section');
+                return;
+            }
+
+            var sectionIds = [];
+            checked.forEach(function (cb) { sectionIds.push(cb.value); });
+
+            runSectionScanBtn.disabled = true;
+            runSectionScanBtn.textContent = 'Starting...';
+
+            Craft.sendActionRequest('POST', 'appleseed/dashboard/run-scan', {
+                data: { sectionIds: sectionIds }
+            })
+                .then(function () {
+                    runSectionScanBtn.textContent = 'Scan Queued';
+                    sectionPicker.style.display = 'none';
+                    startProgressPolling();
+                })
+                .catch(function (error) {
+                    runSectionScanBtn.disabled = false;
+                    runSectionScanBtn.textContent = 'Scan Selected Sections';
                     Craft.cp.displayError('Failed to start scan');
                     console.error('Appleseed scan error:', error);
                 });
@@ -137,7 +207,10 @@
     });
 
     // Auto-start polling if a scan is already running
-    if (progressEl && document.body.dataset.runningScan === '1') {
+    var scanActive = document.getElementById('appleseed-scan-active');
+    if (progressEl && scanActive && scanActive.dataset.running === '1') {
         startProgressPolling();
     }
+
+    }); // end DOMContentLoaded
 })();

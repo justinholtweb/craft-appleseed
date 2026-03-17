@@ -19,7 +19,7 @@ class Scanner extends Component
      */
     public function runFullScan(?callable $progressCallback = null): ScanRecord
     {
-        return $this->_runScan('full', null, null, $progressCallback);
+        return $this->_runScan('full', null, null, null, $progressCallback);
     }
 
     /**
@@ -27,7 +27,7 @@ class Scanner extends Component
      */
     public function runDatabaseScan(?callable $progressCallback = null): ScanRecord
     {
-        return $this->_runScan('database', null, null, $progressCallback);
+        return $this->_runScan('database', null, null, null, $progressCallback);
     }
 
     /**
@@ -35,10 +35,20 @@ class Scanner extends Component
      */
     public function runEntryScan(int $entryId, ?int $siteId = null, ?callable $progressCallback = null): ScanRecord
     {
-        return $this->_runScan('entry', $entryId, $siteId, $progressCallback);
+        return $this->_runScan('entry', $entryId, $siteId, null, $progressCallback);
     }
 
-    private function _runScan(string $type, ?int $entryId, ?int $siteId, ?callable $progressCallback): ScanRecord
+    /**
+     * Run a scan limited to specific sections.
+     *
+     * @param int[] $sectionIds
+     */
+    public function runSectionScan(array $sectionIds, ?callable $progressCallback = null): ScanRecord
+    {
+        return $this->_runScan('section', null, null, $sectionIds, $progressCallback);
+    }
+
+    private function _runScan(string $type, ?int $entryId, ?int $siteId, ?array $sectionIds, ?callable $progressCallback): ScanRecord
     {
         $plugin = Plugin::getInstance();
         /** @var Settings $settings */
@@ -58,7 +68,7 @@ class Scanner extends Component
                 $progressCallback('Discovering links...', 0);
             }
 
-            $discoveredLinks = $this->_discoverLinks($type, $entryId, $siteId, $settings, $progressCallback);
+            $discoveredLinks = $this->_discoverLinks($type, $entryId, $siteId, $sectionIds, $settings, $progressCallback);
             $linkRecords = $this->_upsertLinks($discoveredLinks, $scan->id);
 
             $scan->totalLinksFound = count($linkRecords);
@@ -137,7 +147,7 @@ class Scanner extends Component
     /**
      * @return array<array{url: string, sources: array}>
      */
-    private function _discoverLinks(string $type, ?int $entryId, ?int $siteId, Settings $settings, ?callable $progressCallback): array
+    private function _discoverLinks(string $type, ?int $entryId, ?int $siteId, ?array $sectionIds, Settings $settings, ?callable $progressCallback): array
     {
         $plugin = Plugin::getInstance();
         $allLinks = [];
@@ -166,9 +176,10 @@ class Scanner extends Component
             }
         } else {
             // Database scan
-            if (in_array($type, ['full', 'database'])) {
+            if (in_array($type, ['full', 'database', 'section'])) {
                 $links = $plugin->linkExtractor->extractAllLinks(
                     $progressCallback ? fn($count) => $progressCallback("Extracted links from {$count} entries...", 0) : null,
+                    $sectionIds,
                 );
                 foreach ($links as $link) {
                     $allLinks[] = [

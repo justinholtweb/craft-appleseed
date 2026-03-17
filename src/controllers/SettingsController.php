@@ -55,6 +55,7 @@ class SettingsController extends Controller
         $settings->notificationThreshold = (int) $request->getBodyParam('notificationThreshold', 1);
         $settings->ignorePatterns = $request->getBodyParam('ignorePatterns', '');
         $settings->userAgent = $request->getBodyParam('userAgent', 'Appleseed Link Checker (Craft CMS)');
+        $settings->emailLayoutTemplate = $request->getBodyParam('emailLayoutTemplate', '');
 
         if (!$settings->validate()) {
             Craft::$app->getSession()->setError('Couldn\'t save settings.');
