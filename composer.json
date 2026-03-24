@@ -2,7 +2,7 @@
     "name": "justinholtweb/craft-appleseed",
     "description": "Broken link checker for Craft CMS 5",
     "type": "craft-plugin",
-    "license": "MIT",
+    "license": "proprietary",
     "keywords": [
         "craftcms",
         "broken-links",
