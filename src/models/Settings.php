@@ -70,7 +70,7 @@ class Settings extends Model
      */
     public function getIgnorePatternsArray(): array
     {
-        if (empty($this->ignorePatterns)) {
+        if ($this->ignorePatterns === '') {
             return [];
         }
 
@@ -87,7 +87,7 @@ class Settings extends Model
     {
         $parsed = $this->getNotificationEmailsParsed();
 
-        if (empty($parsed)) {
+        if ($parsed === '') {
             return [];
         }
 

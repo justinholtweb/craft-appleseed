@@ -65,11 +65,11 @@ class Plugin extends BasePlugin
     public function getCpNavItem(): ?array
     {
         $item = parent::getCpNavItem();
-        $item['label'] = 'Appleseed';
+        $item['label'] = Craft::t('appleseed', 'Appleseed');
 
         $item['subnav'] = [
-            'dashboard' => ['label' => 'Dashboard', 'url' => 'appleseed/dashboard'],
-            'settings' => ['label' => 'Settings', 'url' => 'appleseed/settings'],
+            'dashboard' => ['label' => Craft::t('appleseed', 'Dashboard'), 'url' => 'appleseed/dashboard'],
+            'settings' => ['label' => Craft::t('appleseed', 'Settings'), 'url' => 'appleseed/settings'],
         ];
 
         // Badge count of broken links
@@ -119,16 +119,16 @@ class Plugin extends BasePlugin
             UserPermissions::EVENT_REGISTER_PERMISSIONS,
             function (RegisterUserPermissionsEvent $event) {
                 $event->permissions[] = [
-                    'heading' => 'Appleseed',
+                    'heading' => Craft::t('appleseed', 'Appleseed'),
                     'permissions' => [
                         'appleseed-viewDashboard' => [
-                            'label' => 'View broken link dashboard',
+                            'label' => Craft::t('appleseed', 'View broken link dashboard'),
                         ],
                         'appleseed-runScans' => [
-                            'label' => 'Run link scans',
+                            'label' => Craft::t('appleseed', 'Run link scans'),
                         ],
                         'appleseed-manageSettings' => [
-                            'label' => 'Manage Appleseed settings',
+                            'label' => Craft::t('appleseed', 'Manage Appleseed settings'),
                         ],
                     ],
                 ];

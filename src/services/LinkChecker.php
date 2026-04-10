@@ -57,7 +57,7 @@ class LinkChecker extends Component
                 $statusCode = $response->getStatusCode();
 
                 // If HEAD returns 405/400/403, some servers don't support HEAD -- try GET
-                if (in_array($statusCode, [405, 400, 403])) {
+                if (in_array($statusCode, [405, 400, 403], true)) {
                     $response = $client->get($url);
                 }
 

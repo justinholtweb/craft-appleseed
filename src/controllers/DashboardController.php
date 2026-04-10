@@ -3,13 +3,12 @@
 namespace justinholtweb\appleseed\controllers;
 
 use Craft;
-use craft\models\Section;
 use craft\web\Controller;
 use justinholtweb\appleseed\jobs\CheckLinksJob;
 use justinholtweb\appleseed\jobs\ScanJob;
 use justinholtweb\appleseed\Plugin;
 use justinholtweb\appleseed\records\LinkRecord;
-use justinholtweb\appleseed\records\ScanRecord;
+use yii\web\NotFoundHttpException;
 use yii\web\Response;
 
 class DashboardController extends Controller
@@ -69,14 +68,14 @@ class DashboardController extends Controller
         $scan = $plugin->reporting->getLastCompletedScan();
 
         if (!$scan) {
-            Craft::$app->getSession()->setError('No completed scan found to preview.');
+            Craft::$app->getSession()->setError(Craft::t('appleseed', 'No completed scan found to preview.'));
             return $this->redirect('appleseed/dashboard');
         }
 
         $html = $plugin->reporting->renderScanReportEmail($scan);
 
         $response = Craft::$app->getResponse();
-        $response->format = \yii\web\Response::FORMAT_HTML;
+        $response->format = Response::FORMAT_HTML;
         $response->content = $html;
 
         return $response;
@@ -91,7 +90,7 @@ class DashboardController extends Controller
         $link = $plugin->reporting->getLinkDetail($linkId);
 
         if (!$link) {
-            throw new \yii\web\NotFoundHttpException('Link not found');
+            throw new NotFoundHttpException(Craft::t('appleseed', 'Link not found.'));
         }
 
         return $this->renderTemplate('appleseed/dashboard/_detail', [
@@ -117,7 +116,7 @@ class DashboardController extends Controller
 
         Craft::$app->getQueue()->push($job);
 
-        return $this->asJson(['success' => true, 'message' => 'Scan queued']);
+        return $this->asJson(['success' => true, 'message' => Craft::t('appleseed', 'Scan queued.')]);
     }
 
     /**
@@ -172,7 +171,7 @@ class DashboardController extends Controller
         $linkRecord = LinkRecord::findOne($linkId);
 
         if (!$linkRecord) {
-            return $this->asJson(['success' => false, 'message' => 'Link not found']);
+            return $this->asJson(['success' => false, 'message' => Craft::t('appleseed', 'Link not found.')]);
         }
 
         $linkRecord->isIgnored = true;
@@ -195,7 +194,7 @@ class DashboardController extends Controller
         $linkRecord = LinkRecord::findOne($linkId);
 
         if (!$linkRecord) {
-            return $this->asJson(['success' => false, 'message' => 'Link not found']);
+            return $this->asJson(['success' => false, 'message' => Craft::t('appleseed', 'Link not found.')]);
         }
 
         $linkRecord->isIgnored = false;
@@ -220,7 +219,7 @@ class DashboardController extends Controller
             'linkIds' => [$linkId],
         ]));
 
-        return $this->asJson(['success' => true, 'message' => 'Re-check queued']);
+        return $this->asJson(['success' => true, 'message' => Craft::t('appleseed', 'Re-check queued.')]);
     }
 
     /**

@@ -4,11 +4,11 @@ namespace justinholtweb\appleseed\services;
 
 use Craft;
 use craft\base\Component;
-use craft\helpers\Db;
+use craft\helpers\UrlHelper;
+use craft\web\View;
 use justinholtweb\appleseed\models\Settings;
 use justinholtweb\appleseed\Plugin;
 use justinholtweb\appleseed\records\LinkRecord;
-use justinholtweb\appleseed\records\LinkSourceRecord;
 use justinholtweb\appleseed\records\ScanRecord;
 use yii\db\Query;
 
@@ -67,7 +67,7 @@ class Reporting extends Component
 
         // Get link records
         $allowedSorts = ['url', 'status', 'statusCode', 'lastCheckedAt'];
-        $sortCol = in_array($sort, $allowedSorts) ? "l.{$sort}" : 'l.status';
+        $sortCol = in_array($sort, $allowedSorts, true) ? "l.{$sort}" : 'l.status';
         $dir = strtolower($direction) === 'desc' ? SORT_DESC : SORT_ASC;
 
         $links = $query
@@ -270,7 +270,7 @@ class Reporting extends Component
         $oldMode = $view->getTemplateMode();
 
         $summary = $this->getDashboardSummary();
-        $cpUrl = rtrim(\craft\helpers\UrlHelper::cpUrl(), '/');
+        $cpUrl = rtrim(UrlHelper::cpUrl(), '/');
 
         // Fetch broken links with source details (capped at 25 for email)
         $maxBrokenInEmail = 25;
@@ -292,7 +292,7 @@ class Reporting extends Component
         unset($link);
 
         // Render the content body in CP template mode
-        $view->setTemplateMode(\craft\web\View::TEMPLATE_MODE_CP);
+        $view->setTemplateMode(View::TEMPLATE_MODE_CP);
         $content = $view->renderTemplate('appleseed/email/scan-report', [
             'scan' => $scan,
             'summary' => $summary,
@@ -312,7 +312,7 @@ class Reporting extends Component
 
         if (!empty($layoutTemplate)) {
             // Custom layout lives in the site templates directory
-            $view->setTemplateMode(\craft\web\View::TEMPLATE_MODE_SITE);
+            $view->setTemplateMode(View::TEMPLATE_MODE_SITE);
             $html = $view->renderTemplate($layoutTemplate, $layoutVars);
         } else {
             $html = $view->renderTemplate('appleseed/email/_default-layout', $layoutVars);

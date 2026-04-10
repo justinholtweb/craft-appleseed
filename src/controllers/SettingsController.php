@@ -58,14 +58,14 @@ class SettingsController extends Controller
         $settings->emailLayoutTemplate = $request->getBodyParam('emailLayoutTemplate', '');
 
         if (!$settings->validate()) {
-            Craft::$app->getSession()->setError('Couldn\'t save settings.');
+            Craft::$app->getSession()->setError(Craft::t('appleseed', 'Couldn’t save settings.'));
             return $this->renderTemplate('appleseed/settings/_index', [
                 'settings' => $settings,
             ]);
         }
 
         Craft::$app->getPlugins()->savePluginSettings($plugin, $settings->toArray());
-        Craft::$app->getSession()->setNotice('Settings saved.');
+        Craft::$app->getSession()->setNotice(Craft::t('appleseed', 'Settings saved.'));
 
         return $this->redirectToPostedUrl();
     }

@@ -4,6 +4,8 @@ namespace justinholtweb\appleseed\console\controllers;
 
 use Craft;
 use craft\console\Controller;
+use craft\web\View;
+use justinholtweb\appleseed\models\Settings;
 use justinholtweb\appleseed\Plugin;
 use yii\console\ExitCode;
 
@@ -141,7 +143,7 @@ class ScanController extends Controller
             return ExitCode::DATAERR;
         }
 
-        Craft::$app->getView()->setTemplateMode(\craft\web\View::TEMPLATE_MODE_CP);
+        Craft::$app->getView()->setTemplateMode(View::TEMPLATE_MODE_CP);
 
         $html = $plugin->reporting->renderScanReportEmail($scan);
 
@@ -170,14 +172,14 @@ class ScanController extends Controller
             return ExitCode::DATAERR;
         }
 
-        Craft::$app->getView()->setTemplateMode(\craft\web\View::TEMPLATE_MODE_CP);
+        Craft::$app->getView()->setTemplateMode(View::TEMPLATE_MODE_CP);
 
         $html = $plugin->reporting->renderScanReportEmail($scan);
 
         if ($this->to) {
             $recipients = array_map('trim', explode(',', $this->to));
         } else {
-            /** @var \justinholtweb\appleseed\models\Settings $settings */
+            /** @var Settings $settings */
             $settings = $plugin->getSettings();
             $recipients = $settings->getNotificationEmailsArray();
         }

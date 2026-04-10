@@ -4,11 +4,12 @@ namespace justinholtweb\appleseed\services;
 
 use Craft;
 use craft\base\Component;
+use craft\base\FieldInterface;
 use craft\elements\Entry;
-use craft\fields\Url as UrlField;
 use craft\fields\Link as LinkField;
 use craft\fields\Matrix as MatrixField;
 use craft\fields\Table as TableField;
+use craft\fields\Url as UrlField;
 use DOMDocument;
 use DOMXPath;
 
@@ -104,7 +105,7 @@ class LinkExtractor extends Component
         }
     }
 
-    private function _extractFromField(Entry $entry, mixed $field, string $handle): void
+    private function _extractFromField(Entry $entry, FieldInterface $field, string $handle): void
     {
         $value = $entry->getFieldValue($handle);
 

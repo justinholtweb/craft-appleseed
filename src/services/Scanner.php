@@ -176,7 +176,7 @@ class Scanner extends Component
             }
         } else {
             // Database scan
-            if (in_array($type, ['full', 'database', 'section'])) {
+            if (in_array($type, ['full', 'database', 'section'], true)) {
                 $links = $plugin->linkExtractor->extractAllLinks(
                     $progressCallback ? fn($count) => $progressCallback("Extracted links from {$count} entries...", 0) : null,
                     $sectionIds,
@@ -196,7 +196,7 @@ class Scanner extends Component
             }
 
             // Spider scan
-            if (in_array($type, ['full', 'spider']) && $settings->spiderEnabled) {
+            if (in_array($type, ['full', 'spider'], true) && $settings->spiderEnabled) {
                 if ($progressCallback) {
                     $progressCallback('Spidering site pages...', 0);
                 }
