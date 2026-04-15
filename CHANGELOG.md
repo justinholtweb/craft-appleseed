@@ -1,6 +1,17 @@
 # Changelog
 
-## 1.0.0 - 2026-03-24
+## 5.0.1 - 2026-04-10
+
+### Added
+
+- Strict in_array(): Added true 3rd arg in LinkChecker.php:60, Scanner.php:179,199, Reporting.php:70. 
+- Import inline FQCNs: \craft\helpers\UrlHelper, \craft\web\View, \yii\web\NotFoundHttpException, \yii\web\Response::FORMAT_HTML now properly imported in Reporting.php, DashboardController.php, scanController.php.
+- Translation wrappers: Wrapped user-facing strings in Craft::t('appleseed', ...) — CP nav labels, permission labels/heading in Plugin.php, flash messages and AJAX response messages in DashboardController.php and SettingsController.php.
+- Type declarations: LinkExtractor::_extractFromField() now accepts FieldInterface instead of mixed.
+- String emptiness checks: Settings.php uses === '' instead of empty() for string vars.
+- Unused imports removed: craft\models\Section, craft\helpers\Db, LinkSourceRecord, ScanRecord dropped from DashboardController / Reporting.
+
+## 5.0.0 - 2026-03-24
 
 ### Added
 - Initial release

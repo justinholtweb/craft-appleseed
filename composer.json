@@ -3,6 +3,7 @@
     "description": "Broken link checker for Craft CMS 5",
     "type": "craft-plugin",
     "license": "proprietary",
+    "version": "5.0.1",
     "keywords": [
         "craftcms",
         "broken-links",
