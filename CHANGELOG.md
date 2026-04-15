@@ -1,6 +1,12 @@
 # Changelog
 
-## 5.0.1 - 2026-04-10
+## 5.0.2 - 2026-04-15
+
+### Added
+
+- Changelog file with initial entries for 5.0.x releases.
+
+## 5.0.0 - 2026-03-24
 
 ### Added
 
