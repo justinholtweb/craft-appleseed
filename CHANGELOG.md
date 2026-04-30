@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.0.3 - 2026-04-30
+
+### Security
+
+- Notification-failure log lines now mask recipient email addresses (e.g. `j***@example.com`) instead of writing them in plain text to Craft logs.
+
 ## 5.0.2 - 2026-04-15
 
 ### Added

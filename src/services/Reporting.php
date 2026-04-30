@@ -347,8 +347,21 @@ class Reporting extends Component
                     ->setHtmlBody($html)
                     ->send();
             } catch (\Throwable $e) {
-                Craft::warning("Appleseed: Failed to send notification to {$email}: {$e->getMessage()}", __METHOD__);
+                Craft::warning("Appleseed: Failed to send notification to {$this->_maskEmail($email)}: {$e->getMessage()}", __METHOD__);
             }
         }
+    }
+
+    /**
+     * Mask an email for logs: "alice@example.com" -> "a***@example.com".
+     */
+    private function _maskEmail(string $email): string
+    {
+        $at = strpos($email, '@');
+        if ($at === false || $at === 0) {
+            return '***';
+        }
+
+        return substr($email, 0, 1) . '***' . substr($email, $at);
     }
 }
