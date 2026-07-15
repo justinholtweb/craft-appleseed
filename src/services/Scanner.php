@@ -4,6 +4,7 @@ namespace justinholtweb\appleseed\services;
 
 use Craft;
 use craft\base\Component;
+use craft\db\ActiveQuery;
 use craft\elements\Entry;
 use craft\helpers\Db;
 use justinholtweb\appleseed\models\Settings;
@@ -14,47 +15,59 @@ use justinholtweb\appleseed\records\ScanRecord;
 
 class Scanner extends Component
 {
+    /** @var string[] Link statuses that count as broken. */
+    private const BROKEN_STATUSES = ['broken', 'dns_error', 'timeout', 'server_error'];
+
     /**
-     * Run a full scan: discover links, check them, report results.
+     * Run a full scan synchronously: discover links, check them, report results.
      */
     public function runFullScan(?callable $progressCallback = null): ScanRecord
     {
-        return $this->_runScan('full', null, null, null, $progressCallback);
+        return $this->_runScanSync('full', null, null, null, $progressCallback);
     }
 
     /**
-     * Run a database-only scan.
+     * Run a database-only scan synchronously.
      */
     public function runDatabaseScan(?callable $progressCallback = null): ScanRecord
     {
-        return $this->_runScan('database', null, null, null, $progressCallback);
+        return $this->_runScanSync('database', null, null, null, $progressCallback);
     }
 
     /**
-     * Run a scan for a single entry.
+     * Run a scan for a single entry synchronously.
      */
     public function runEntryScan(int $entryId, ?int $siteId = null, ?callable $progressCallback = null): ScanRecord
     {
-        return $this->_runScan('entry', $entryId, $siteId, null, $progressCallback);
+        return $this->_runScanSync('entry', $entryId, $siteId, null, $progressCallback);
     }
 
     /**
-     * Run a scan limited to specific sections.
+     * Run a scan limited to specific sections synchronously.
      *
      * @param int[] $sectionIds
      */
     public function runSectionScan(array $sectionIds, ?callable $progressCallback = null): ScanRecord
     {
-        return $this->_runScan('section', null, null, $sectionIds, $progressCallback);
+        return $this->_runScanSync('section', null, null, $sectionIds, $progressCallback);
     }
 
-    private function _runScan(string $type, ?int $entryId, ?int $siteId, ?array $sectionIds, ?callable $progressCallback): ScanRecord
+    /**
+     * Begin a scan: create the scan record and discover + persist its links.
+     *
+     * The returned scan is left in the `running` state with its links stored
+     * (tagged with `lastScanId`) but not yet checked. Callers finish the scan
+     * either synchronously (see {@see _runScanSync()}) or in batches via the
+     * queue (see the CheckLinksBatchedJob).
+     *
+     * @param int[]|null $sectionIds
+     */
+    public function startScan(string $type, ?int $entryId = null, ?int $siteId = null, ?array $sectionIds = null, ?callable $progressCallback = null): ScanRecord
     {
         $plugin = Plugin::getInstance();
         /** @var Settings $settings */
         $settings = $plugin->getSettings();
 
-        // Phase 0: Create scan record
         $scan = new ScanRecord();
         $scan->status = 'running';
         $scan->type = $type;
@@ -63,7 +76,6 @@ class Scanner extends Component
         $scan->save(false);
 
         try {
-            // Phase 1: Discovery
             if ($progressCallback) {
                 $progressCallback('Discovering links...', 0);
             }
@@ -73,75 +85,162 @@ class Scanner extends Component
 
             $scan->totalLinksFound = count($linkRecords);
             $scan->save(false);
+        } catch (\Throwable $e) {
+            $this->failScan($scan);
+            Craft::error("Appleseed scan discovery failed: {$e->getMessage()}", __METHOD__);
+            throw $e;
+        }
 
-            // Phase 2: Check links
+        return $scan;
+    }
+
+    /**
+     * A query for the links belonging to a scan that still need checking.
+     *
+     * The result set is intentionally stable for the duration of the scan
+     * (filtered only on immutable columns and ordered by id), so it can be
+     * sliced across multiple batched queue jobs without skipping or
+     * double-processing items as link statuses change.
+     */
+    public function getScanLinkQuery(int $scanId): ActiveQuery
+    {
+        return LinkRecord::find()
+            ->where(['lastScanId' => $scanId, 'isIgnored' => false])
+            ->orderBy(['id' => SORT_ASC]);
+    }
+
+    /**
+     * Check a single link belonging to a scan and persist the result.
+     *
+     * Ignored links and — when external checking is disabled — external links
+     * are skipped without touching the network.
+     */
+    public function checkScanLink(LinkRecord $linkRecord, ScanRecord $scan): void
+    {
+        $plugin = Plugin::getInstance();
+        /** @var Settings $settings */
+        $settings = $plugin->getSettings();
+
+        if ($linkRecord->isIgnored) {
+            return;
+        }
+
+        if (!$settings->checkExternalLinks && $this->_isExternalUrl($linkRecord->url)) {
+            return;
+        }
+
+        $result = $plugin->linkChecker->checkUrl($linkRecord->url);
+
+        $linkRecord->statusCode = $result->statusCode;
+        $linkRecord->status = $result->status;
+        $linkRecord->redirectUrl = $result->redirectUrl;
+        $linkRecord->redirectChain = $result->redirectChain ? json_encode($result->redirectChain) : null;
+        $linkRecord->errorMessage = $result->errorMessage;
+        $linkRecord->lastCheckedAt = Db::prepareDateForDb(new \DateTime());
+        $linkRecord->lastScanId = $scan->id;
+        $linkRecord->save(false);
+    }
+
+    /**
+     * Refresh a running scan's tallies from the database (best-effort progress).
+     */
+    public function updateScanProgress(ScanRecord $scan): void
+    {
+        $this->_applyCounts($scan);
+        $scan->save(false);
+    }
+
+    /**
+     * Finalize a scan: tally results, mark it completed, and notify if needed.
+     *
+     * Counts are recomputed authoritatively from the stored link records, so
+     * this is safe to call once at the end of a synchronous scan or after the
+     * final batch of a queued scan.
+     */
+    public function finalizeScan(ScanRecord $scan): void
+    {
+        $plugin = Plugin::getInstance();
+        /** @var Settings $settings */
+        $settings = $plugin->getSettings();
+
+        $this->_applyCounts($scan);
+        $scan->status = 'completed';
+        $scan->completedAt = Db::prepareDateForDb(new \DateTime());
+        $scan->save(false);
+
+        if ($scan->brokenCount >= $settings->notificationThreshold) {
+            $plugin->reporting->sendScanNotification($scan);
+        }
+    }
+
+    /**
+     * Mark a scan as failed.
+     */
+    public function failScan(ScanRecord $scan): void
+    {
+        $scan->status = 'failed';
+        $scan->completedAt = Db::prepareDateForDb(new \DateTime());
+        $scan->save(false);
+    }
+
+    /**
+     * Run a scan start-to-finish in the current process.
+     *
+     * @param int[]|null $sectionIds
+     */
+    private function _runScanSync(string $type, ?int $entryId, ?int $siteId, ?array $sectionIds, ?callable $progressCallback): ScanRecord
+    {
+        $plugin = Plugin::getInstance();
+
+        $scan = $this->startScan($type, $entryId, $siteId, $sectionIds, $progressCallback);
+
+        try {
             if ($progressCallback) {
                 $progressCallback('Checking links...', 0);
             }
 
+            $total = $scan->totalLinksFound;
             $checked = 0;
-            $broken = 0;
-            $redirects = 0;
-            $working = 0;
 
-            foreach ($linkRecords as $linkRecord) {
-                if ($linkRecord->isIgnored) {
-                    continue;
-                }
-
-                // Skip external links if disabled
-                if (!$settings->checkExternalLinks && $this->_isExternalUrl($linkRecord->url)) {
-                    continue;
-                }
-
-                $result = $plugin->linkChecker->checkUrl($linkRecord->url);
-
-                $linkRecord->statusCode = $result->statusCode;
-                $linkRecord->status = $result->status;
-                $linkRecord->redirectUrl = $result->redirectUrl;
-                $linkRecord->redirectChain = $result->redirectChain ? json_encode($result->redirectChain) : null;
-                $linkRecord->errorMessage = $result->errorMessage;
-                $linkRecord->lastCheckedAt = Db::prepareDateForDb(new \DateTime());
-                $linkRecord->lastScanId = $scan->id;
-                $linkRecord->save(false);
-
+            foreach ($this->getScanLinkQuery($scan->id)->each() as $linkRecord) {
+                /** @var LinkRecord $linkRecord */
+                $this->checkScanLink($linkRecord, $scan);
                 $checked++;
 
-                match ($result->status) {
-                    'broken', 'dns_error', 'timeout' => $broken++,
-                    'redirect' => $redirects++,
-                    'server_error' => $broken++,
-                    default => $working++,
-                };
-
                 if ($progressCallback) {
-                    $progressCallback("Checked {$checked} of {$scan->totalLinksFound} links", $checked / max(1, $scan->totalLinksFound));
+                    $progressCallback("Checked {$checked} of {$total} links", $checked / max(1, $total));
                 }
             }
 
-            // Phase 3: Finalize
-            $scan->totalLinksChecked = $checked;
-            $scan->brokenCount = $broken;
-            $scan->redirectCount = $redirects;
-            $scan->workingCount = $working;
-            $scan->status = 'completed';
-            $scan->completedAt = Db::prepareDateForDb(new \DateTime());
-            $scan->save(false);
-
-            // Send notification if threshold met
-            if ($broken >= $settings->notificationThreshold) {
-                $plugin->reporting->sendScanNotification($scan);
-            }
+            $this->finalizeScan($scan);
         } catch (\Throwable $e) {
-            $scan->status = 'failed';
-            $scan->completedAt = Db::prepareDateForDb(new \DateTime());
-            $scan->save(false);
-
+            $this->failScan($scan);
             Craft::error("Appleseed scan failed: {$e->getMessage()}", __METHOD__);
             throw $e;
         }
 
         return $scan;
+    }
+
+    /**
+     * Recompute a scan's status tallies from its stored link records.
+     */
+    private function _applyCounts(ScanRecord $scan): void
+    {
+        $broken = (int) $this->getScanLinkQuery($scan->id)
+            ->andWhere(['status' => self::BROKEN_STATUSES])
+            ->count();
+        $redirects = (int) $this->getScanLinkQuery($scan->id)
+            ->andWhere(['status' => 'redirect'])
+            ->count();
+        $working = (int) $this->getScanLinkQuery($scan->id)
+            ->andWhere(['status' => 'working'])
+            ->count();
+
+        $scan->brokenCount = $broken;
+        $scan->redirectCount = $redirects;
+        $scan->workingCount = $working;
+        $scan->totalLinksChecked = $broken + $redirects + $working;
     }
 
     /**

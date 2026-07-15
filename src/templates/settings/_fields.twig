@@ -50,6 +50,19 @@
     errors: settings.getErrors('rateLimitPerSecond'),
 }) }}
 
+{{ forms.textField({
+    label: 'Scan Batch Size',
+    instructions: 'How many links each queue job checks before handing off to the next batch. Smaller batches keep individual jobs short and avoid queue timeouts on large sites; larger batches reduce overhead. This is a maximum — Craft may stop a batch early based on memory usage.',
+    id: 'scanBatchSize',
+    name: 'scanBatchSize',
+    value: settings.scanBatchSize,
+    type: 'number',
+    min: 1,
+    max: 1000,
+    size: 5,
+    errors: settings.getErrors('scanBatchSize'),
+}) }}
+
 {{ forms.autosuggestField({
     label: 'User Agent',
     instructions: 'The User-Agent string sent with HTTP requests.',

@@ -1,5 +1,16 @@
 # Changelog
 
+## 5.1.0 - 2026-07-15
+
+### Added
+
+- Scans now check links in batches using Craft's [batched jobs](https://craftcms.com/docs/5.x/extend/queue-jobs.html#batched-jobs). Discovery runs in the initial `ScanJob`, then link checking is handed off to a new `CheckLinksBatchedJob` that processes links in configurable batches, so no single queue job runs long enough to hit the queue's time limit on large sites. ([#1](https://github.com/justinholtweb/craft-appleseed/issues/1))
+- New "Scan Batch Size" setting (`scanBatchSize`, default 50) controlling how many links each queue job checks before handing off to the next batch.
+
+### Changed
+
+- Scan progress tallies now update after each batch, so the dashboard progress bar advances throughout a queued scan rather than only at the end. Console scans (`appleseed/scan`) and entry-save scans continue to run synchronously in a single process.
+
 ## 5.0.3 - 2026-04-30
 
 ### Security

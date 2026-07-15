@@ -14,6 +14,7 @@ class Settings extends Model
     public float $rateLimitPerSecond = 1.0;
     public bool $spiderEnabled = true;
     public int $maxPagesToSpider = 200;
+    public int $scanBatchSize = 50;
     public string $scanFrequency = 'weekly';
     public bool $scanOnEntrySave = false;
     public string $notificationEmails = '';
@@ -54,7 +55,7 @@ class Settings extends Model
     protected function defineRules(): array
     {
         return [
-            [['timeout', 'maxRetries', 'maxPagesToSpider', 'notificationThreshold'], 'integer', 'min' => 1],
+            [['timeout', 'maxRetries', 'maxPagesToSpider', 'notificationThreshold', 'scanBatchSize'], 'integer', 'min' => 1],
             [['rateLimitPerSecond'], 'number', 'min' => 0.1, 'max' => 100],
             [['scanFrequency'], 'in', 'range' => ['manual', 'daily', 'weekly', 'monthly']],
             [['checkExternalLinks', 'spiderEnabled', 'scanOnEntrySave'], 'boolean'],
@@ -62,6 +63,7 @@ class Settings extends Model
             [['timeout'], 'integer', 'max' => 60],
             [['maxRetries'], 'integer', 'max' => 10],
             [['maxPagesToSpider'], 'integer', 'max' => 10000],
+            [['scanBatchSize'], 'integer', 'max' => 1000],
         ];
     }
 
