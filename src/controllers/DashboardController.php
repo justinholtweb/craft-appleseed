@@ -251,7 +251,10 @@ class DashboardController extends Controller
         $grouped = [];
 
         foreach ($sections as $section) {
-            $type = is_string($section->type) ? $section->type : $section->type->value;
+            $type = $section->type;
+            if ($type === null) {
+                continue;
+            }
             $grouped[$type][] = [
                 'id' => $section->id,
                 'name' => $section->name,

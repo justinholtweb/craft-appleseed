@@ -4,6 +4,7 @@ namespace justinholtweb\appleseed\controllers;
 
 use Craft;
 use craft\web\Controller;
+use justinholtweb\appleseed\models\Settings;
 use justinholtweb\appleseed\Plugin;
 use yii\web\Response;
 
@@ -40,6 +41,7 @@ class SettingsController extends Controller
         $this->requirePostRequest();
 
         $plugin = Plugin::getInstance();
+        /** @var Settings $settings */
         $settings = $plugin->getSettings();
 
         $request = Craft::$app->getRequest();

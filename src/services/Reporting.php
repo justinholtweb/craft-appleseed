@@ -242,10 +242,13 @@ class Reporting extends Component
      */
     public function getLastCompletedScan(): ?ScanRecord
     {
-        return ScanRecord::find()
+        /** @var ScanRecord|null $scan */
+        $scan = ScanRecord::find()
             ->where(['status' => 'completed'])
             ->orderBy(['completedAt' => SORT_DESC])
             ->one();
+
+        return $scan;
     }
 
     /**
@@ -253,10 +256,13 @@ class Reporting extends Component
      */
     public function getRunningScan(): ?ScanRecord
     {
-        return ScanRecord::find()
+        /** @var ScanRecord|null $scan */
+        $scan = ScanRecord::find()
             ->where(['status' => 'running'])
             ->orderBy(['startedAt' => SORT_DESC])
             ->one();
+
+        return $scan;
     }
 
     /**

@@ -11,10 +11,14 @@ use craft\fields\Matrix as MatrixField;
 use craft\fields\Table as TableField;
 use craft\fields\Url as UrlField;
 use DOMDocument;
+use DOMElement;
 use DOMXPath;
 
 class LinkExtractor extends Component
 {
+    /** @var string Matches an element reference tag, e.g. `{entry:123@1:url||https://example.com/page}`. */
+    private const REF_TAG_PATTERN = '/\{\w+\:[^\}]+\}/';
+
     /**
      * Discovered links: [['url' => string, 'entryId' => int, 'siteId' => int, 'fieldHandle' => string, 'linkText' => string|null]]
      */
@@ -109,9 +113,18 @@ class LinkExtractor extends Component
     {
         $value = $entry->getFieldValue($handle);
 
-        // CKEditor / Rich Text fields -- have getRawContent() or serialize to string
+        // CKEditor / Rich Text fields -- have getRawContent() or serialize to string.
+        // Use the *parsed* content so element reference tags (`{entry:123@1:url||...}`)
+        // are resolved to real URLs rather than being treated as literal hrefs.
         if (is_object($value) && method_exists($value, 'getRawContent')) {
-            $html = $value->getRawContent();
+            if (method_exists($value, 'getParsedContent')) {
+                $html = (string) $value->getParsedContent();
+            } elseif (method_exists($value, '__toString')) {
+                $html = (string) $value;
+            } else {
+                $html = (string) $value->getRawContent();
+            }
+
             $this->_extractFromHtml($html, $entry, $handle);
             return;
         }
@@ -183,6 +196,9 @@ class LinkExtractor extends Component
         $anchors = $xpath->query('//a[@href]');
         if ($anchors) {
             foreach ($anchors as $anchor) {
+                if (!$anchor instanceof DOMElement) {
+                    continue;
+                }
                 $url = $anchor->getAttribute('href');
                 $linkText = trim($anchor->textContent);
                 $this->_addLink($url, $entry, $fieldHandle, $linkText ?: null);
@@ -193,6 +209,9 @@ class LinkExtractor extends Component
         $images = $xpath->query('//img[@src]');
         if ($images) {
             foreach ($images as $img) {
+                if (!$img instanceof DOMElement) {
+                    continue;
+                }
                 $url = $img->getAttribute('src');
                 $alt = $img->getAttribute('alt');
                 $this->_addLink($url, $entry, $fieldHandle, $alt ?: null);
@@ -208,6 +227,15 @@ class LinkExtractor extends Component
 
         if (empty($url)) {
             return;
+        }
+
+        // Resolve any element reference tags that made it through unparsed
+        if (str_contains($url, '{')) {
+            $resolved = $this->_resolveRefTags($url, $entry->siteId);
+            if ($resolved === null) {
+                return;
+            }
+            $url = $resolved;
         }
 
         // Skip non-HTTP schemes
@@ -246,6 +274,27 @@ class LinkExtractor extends Component
             'fieldHandle' => $fieldHandle,
             'linkText' => $linkText ? mb_substr($linkText, 0, 500) : null,
         ];
+    }
+
+    /**
+     * Resolve element reference tags (e.g. `{entry:123@1:url||https://example.com/page}`)
+     * to real URLs.
+     *
+     * Rich text values normally arrive already parsed, but reference tags can still turn
+     * up in plain text, Table, and URL field values. Returns null when a tag can't be
+     * resolved -- the referenced element is gone and there's no fallback URL, so there is
+     * nothing to check.
+     */
+    private function _resolveRefTags(string $url, ?int $siteId): ?string
+    {
+        $url = trim(Craft::$app->getElements()->parseRefs($url, $siteId));
+
+        // parseRefs leaves unresolvable tags in place
+        if (preg_match(self::REF_TAG_PATTERN, $url)) {
+            return null;
+        }
+
+        return $url !== '' ? $url : null;
     }
 
     private function _looksLikeUrl(string $value): bool

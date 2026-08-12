@@ -8,12 +8,16 @@ use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
 use GuzzleHttp\RequestOptions;
 use DOMDocument;
+use DOMElement;
 use DOMXPath;
 use justinholtweb\appleseed\models\Settings;
 use justinholtweb\appleseed\Plugin;
 
 class Spider extends Component
 {
+    /** @var string Matches an element reference tag, e.g. `{entry:123@1:url||https://example.com/page}`. */
+    private const REF_TAG_PATTERN = '/\{\w+\:[^\}]+\}/';
+
     /**
      * Crawl all sites via BFS, returning discovered links.
      *
@@ -137,6 +141,9 @@ class Spider extends Component
         $anchors = $xpath->query('//a[@href]');
         if ($anchors) {
             foreach ($anchors as $anchor) {
+                if (!$anchor instanceof DOMElement) {
+                    continue;
+                }
                 $href = trim($anchor->getAttribute('href'));
                 $text = trim($anchor->textContent);
                 $resolved = $this->_resolveUrl($href, $baseUrl);
@@ -150,6 +157,9 @@ class Spider extends Component
         $images = $xpath->query('//img[@src]');
         if ($images) {
             foreach ($images as $img) {
+                if (!$img instanceof DOMElement) {
+                    continue;
+                }
                 $src = trim($img->getAttribute('src'));
                 $alt = trim($img->getAttribute('alt'));
                 $resolved = $this->_resolveUrl($src, $baseUrl);
@@ -174,6 +184,12 @@ class Spider extends Component
 
         // Skip non-HTTP schemes
         if (preg_match('/^(mailto:|tel:|javascript:|data:|#)/', $url)) {
+            return null;
+        }
+
+        // Skip unparsed element reference tags (e.g. `{entry:123@1:url}`), which show up
+        // when a template outputs raw rich text -- they aren't URLs we can check
+        if (preg_match(self::REF_TAG_PATTERN, $url)) {
             return null;
         }
 

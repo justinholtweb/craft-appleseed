@@ -244,7 +244,7 @@ class Scanner extends Component
     }
 
     /**
-     * @return array<array{url: string, sources: array}>
+     * @return array<array{url: string, source: array}>
      */
     private function _discoverLinks(string $type, ?int $entryId, ?int $siteId, ?array $sectionIds, Settings $settings, ?callable $progressCallback): array
     {
@@ -336,6 +336,7 @@ class Scanner extends Component
 
             // Find or create link record
             if (!isset($urlMap[$urlHash])) {
+                /** @var LinkRecord|null $linkRecord */
                 $linkRecord = LinkRecord::find()->where(['urlHash' => $urlHash])->one();
                 if (!$linkRecord) {
                     $linkRecord = new LinkRecord();

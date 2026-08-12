@@ -1,5 +1,17 @@
 # Changelog
 
+## 5.1.1 - 2026-08-12
+
+### Fixed
+
+- Links to entries and assets in CKEditor and other rich text fields are no longer reported as broken. Rich text was read via `getRawContent()`, so element reference tags were never resolved and the link was recorded as the tag itself resolved against the site base URL (e.g. `https://example.com/{entry:123@1:url||https://example.com/page}`). Rich text is now read as parsed content, and any reference tag that still reaches link discovery is resolved (or skipped, if the referenced element is gone and the tag has no fallback URL).
+- The spider now skips unparsed reference tags found in rendered pages rather than recording them as broken links.
+- Existing link records containing unparsed reference tags are removed on update; the next scan records their real URLs.
+
+### Changed
+
+- PHPStan analysis raised from level 0 to level 5, with the type annotations and null checks needed to pass cleanly.
+
 ## 5.1.0 - 2026-07-15
 
 ### Added
