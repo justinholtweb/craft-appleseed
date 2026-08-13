@@ -10,6 +10,7 @@ use GuzzleHttp\RequestOptions;
 use DOMDocument;
 use DOMElement;
 use DOMXPath;
+use justinholtweb\appleseed\helpers\LinkText;
 use justinholtweb\appleseed\models\Settings;
 use justinholtweb\appleseed\Plugin;
 
@@ -148,7 +149,7 @@ class Spider extends Component
                 $text = trim($anchor->textContent);
                 $resolved = $this->_resolveUrl($href, $baseUrl);
                 if ($resolved) {
-                    $links[] = ['url' => $resolved, 'linkText' => $text ?: null];
+                    $links[] = ['url' => $resolved, 'linkText' => LinkText::normalize($text)];
                 }
             }
         }
@@ -164,7 +165,7 @@ class Spider extends Component
                 $alt = trim($img->getAttribute('alt'));
                 $resolved = $this->_resolveUrl($src, $baseUrl);
                 if ($resolved) {
-                    $links[] = ['url' => $resolved, 'linkText' => $alt ?: null];
+                    $links[] = ['url' => $resolved, 'linkText' => LinkText::normalize($alt)];
                 }
             }
         }

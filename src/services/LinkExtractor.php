@@ -13,6 +13,7 @@ use craft\fields\Url as UrlField;
 use DOMDocument;
 use DOMElement;
 use DOMXPath;
+use justinholtweb\appleseed\helpers\LinkText;
 
 class LinkExtractor extends Component
 {
@@ -272,7 +273,7 @@ class LinkExtractor extends Component
             'entryId' => $entry->id,
             'siteId' => $entry->siteId,
             'fieldHandle' => $fieldHandle,
-            'linkText' => $linkText ? mb_substr($linkText, 0, 500) : null,
+            'linkText' => LinkText::normalize($linkText),
         ];
     }
 

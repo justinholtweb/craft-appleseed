@@ -82,12 +82,15 @@ URLs are deduped by `urlHash = SHA-256(url)`. One link can have many sources (en
 | `rateLimitPerSecond` | float | 1.0 | Max requests/sec to same domain (0.1–100) |
 | `spiderEnabled` | bool | true | Enable BFS page crawling |
 | `maxPagesToSpider` | int | 200 | Page limit for spider (1–10000) |
+| `scanBatchSize` | int | 50 | Links checked per queue job (1–1000) |
 | `scanFrequency` | string | weekly | manual / daily / weekly / monthly |
 | `scanOnEntrySave` | bool | false | Auto-scan entry on save |
 | `notificationEmails` | string | '' | Comma-separated recipient list |
 | `notificationThreshold` | int | 1 | Min broken links to trigger email |
+| `emailLayoutTemplate` | string | '' | Optional Twig template wrapping report emails |
 | `ignorePatterns` | string | '' | Newline-separated regex patterns |
 | `userAgent` | string | 'Appleseed Link Checker (Craft CMS)' | HTTP User-Agent header |
+| `defaultStatusFilter` | string | '' | Status the dashboard filters by on first load |
 
 ## CP Routes & Permissions
 

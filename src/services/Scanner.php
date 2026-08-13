@@ -7,6 +7,7 @@ use craft\base\Component;
 use craft\db\ActiveQuery;
 use craft\elements\Entry;
 use craft\helpers\Db;
+use justinholtweb\appleseed\helpers\LinkText;
 use justinholtweb\appleseed\models\Settings;
 use justinholtweb\appleseed\Plugin;
 use justinholtweb\appleseed\records\LinkRecord;
@@ -357,7 +358,7 @@ class Scanner extends Component
             $source->entryId = $discovered['source']['entryId'] ?? null;
             $source->siteId = $discovered['source']['siteId'] ?? null;
             $source->fieldHandle = $discovered['source']['fieldHandle'] ?? null;
-            $source->linkText = $discovered['source']['linkText'] ?? null;
+            $source->linkText = LinkText::normalize($discovered['source']['linkText'] ?? null);
             $source->sourceType = $discovered['source']['sourceType'];
             $source->sourceUrl = $discovered['source']['sourceUrl'] ?? null;
             $source->save(false);

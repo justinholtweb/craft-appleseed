@@ -54,12 +54,17 @@ return [
     'rateLimitPerSecond' => 1.0,
     'spiderEnabled' => true,
     'maxPagesToSpider' => 200,
+    'scanBatchSize' => 50,
     'scanFrequency' => 'weekly', // manual, daily, weekly, monthly
     'scanOnEntrySave' => false,
     'notificationEmails' => '',
     'notificationThreshold' => 1,
+    'emailLayoutTemplate' => '',
     'ignorePatterns' => '',
     'userAgent' => 'Appleseed Link Checker (Craft CMS)',
+    // Status the dashboard filters by on first load: '' (all), broken, redirect,
+    // working, server_error, timeout, dns_error
+    'defaultStatusFilter' => '',
 ];
 ```
 

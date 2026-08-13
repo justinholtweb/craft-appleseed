@@ -94,16 +94,14 @@
 {# Filters #}
 <div class="appleseed-filters">
     <form method="get" action="{{ cpUrl('appleseed/dashboard') }}">
+        <input type="hidden" name="sort" value="{{ sort }}">
+        <input type="hidden" name="direction" value="{{ direction }}">
         <div class="appleseed-filters__row">
             <div class="select">
                 <select name="status" onchange="this.form.submit()">
-                    <option value="">All Statuses</option>
-                    <option value="broken" {{ statusFilter == 'broken' ? 'selected' }}>Broken</option>
-                    <option value="redirect" {{ statusFilter == 'redirect' ? 'selected' }}>Redirect</option>
-                    <option value="working" {{ statusFilter == 'working' ? 'selected' }}>Working</option>
-                    <option value="server_error" {{ statusFilter == 'server_error' ? 'selected' }}>Server Error</option>
-                    <option value="timeout" {{ statusFilter == 'timeout' ? 'selected' }}>Timeout</option>
-                    <option value="dns_error" {{ statusFilter == 'dns_error' ? 'selected' }}>DNS Error</option>
+                    {% for option in statusOptions %}
+                        <option value="{{ option.value }}" {{ statusFilter == option.value ? 'selected' }}>{{ option.label }}</option>
+                    {% endfor %}
                 </select>
             </div>
 
@@ -165,7 +163,14 @@
                             {% endif %}
                         </td>
                         <td>{{ link.sources[0].fieldHandle ?? '—' }}</td>
-                        <td class="appleseed-linktext-cell">{{ link.sources[0].linkText ?? '—' }}</td>
+                        <td class="appleseed-linktext-cell">
+                            {%- set linkText = link.sources[0].linkText ?? null -%}
+                            {%- if linkText -%}
+                                <span class="appleseed-linktext-cell__text" title="{{ linkText }}">{{ linkText }}</span>
+                            {%- else -%}
+                                —
+                            {%- endif -%}
+                        </td>
                         <td>{{ link.lastCheckedAt ? link.lastCheckedAt|date('M j g:ia') : 'Never' }}</td>
                         <td class="thin">
                             <div class="appleseed-actions">
@@ -179,16 +184,45 @@
         </table>
     </div>
 
-    {# Pagination #}
+    {# Pagination -- only the first, last, and pages either side of the current one,
+       so the pager stays usable when a scan turns up thousands of links #}
     {% if results.totalPages > 1 %}
-        <nav class="appleseed-pagination">
-            {% for p in 1..results.totalPages %}
-                {% if p == page %}
-                    <span class="appleseed-pagination__current">{{ p }}</span>
-                {% else %}
-                    <a href="{{ cpUrl('appleseed/dashboard', { status: statusFilter, search: search, page: p }) }}">{{ p }}</a>
-                {% endif %}
+        {% set pageParams = { status: statusFilter, search: search, sort: sort, direction: direction } %}
+        {% set window = 2 %}
+        {% set windowStart = max(2, page - window) %}
+        {% set windowEnd = min(results.totalPages - 1, page + window) %}
+
+        {% set pageNums = [1] %}
+        {% if windowStart <= windowEnd %}
+            {% for p in windowStart..windowEnd %}
+                {% set pageNums = pageNums|merge([p]) %}
             {% endfor %}
+        {% endif %}
+        {% set pageNums = pageNums|merge([results.totalPages]) %}
+
+        <nav class="appleseed-pagination" role="navigation" aria-label="Pagination">
+            {% if page > 1 %}
+                <a href="{{ cpUrl('appleseed/dashboard', pageParams|merge({ page: page - 1 })) }}" rel="prev">&lsaquo; Prev</a>
+            {% endif %}
+
+            {% set prevNum = 0 %}
+            {% for p in pageNums %}
+                {% if p > prevNum + 1 %}
+                    <span class="appleseed-pagination__gap">&hellip;</span>
+                {% endif %}
+                {% if p == page %}
+                    <span class="appleseed-pagination__current" aria-current="page">{{ p }}</span>
+                {% else %}
+                    <a href="{{ cpUrl('appleseed/dashboard', pageParams|merge({ page: p })) }}">{{ p }}</a>
+                {% endif %}
+                {% set prevNum = p %}
+            {% endfor %}
+
+            {% if page < results.totalPages %}
+                <a href="{{ cpUrl('appleseed/dashboard', pageParams|merge({ page: page + 1 })) }}" rel="next">Next &rsaquo;</a>
+            {% endif %}
+
+            <span class="appleseed-pagination__count">{{ results.total }} links</span>
         </nav>
     {% endif %}
 {% else %}

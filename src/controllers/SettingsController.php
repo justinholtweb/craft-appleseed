@@ -51,6 +51,7 @@ class SettingsController extends Controller
         $settings->rateLimitPerSecond = (float) $request->getBodyParam('rateLimitPerSecond', 1.0);
         $settings->spiderEnabled = (bool) $request->getBodyParam('spiderEnabled');
         $settings->maxPagesToSpider = (int) $request->getBodyParam('maxPagesToSpider', 200);
+        $settings->scanBatchSize = (int) $request->getBodyParam('scanBatchSize', 50);
         $settings->scanFrequency = $request->getBodyParam('scanFrequency', 'weekly');
         $settings->scanOnEntrySave = (bool) $request->getBodyParam('scanOnEntrySave');
         $settings->notificationEmails = $request->getBodyParam('notificationEmails', '');
@@ -58,6 +59,7 @@ class SettingsController extends Controller
         $settings->ignorePatterns = $request->getBodyParam('ignorePatterns', '');
         $settings->userAgent = $request->getBodyParam('userAgent', 'Appleseed Link Checker (Craft CMS)');
         $settings->emailLayoutTemplate = $request->getBodyParam('emailLayoutTemplate', '');
+        $settings->defaultStatusFilter = $request->getBodyParam('defaultStatusFilter', '');
 
         if (!$settings->validate()) {
             Craft::$app->getSession()->setError(Craft::t('appleseed', 'Couldn’t save settings.'));

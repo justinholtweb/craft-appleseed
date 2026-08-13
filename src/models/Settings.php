@@ -22,6 +22,7 @@ class Settings extends Model
     public string $ignorePatterns = '';
     public string $userAgent = 'Appleseed Link Checker (Craft CMS)';
     public string $emailLayoutTemplate = '';
+    public string $defaultStatusFilter = '';
 
     public function behaviors(): array
     {
@@ -52,6 +53,25 @@ class Settings extends Model
         return App::parseEnv($this->emailLayoutTemplate);
     }
 
+    /**
+     * The status options offered by the dashboard filter, and the allowed values for
+     * {@see $defaultStatusFilter}. An empty value means no filtering.
+     *
+     * @return array<array{label: string, value: string}>
+     */
+    public function getStatusFilterOptions(): array
+    {
+        return [
+            ['label' => 'All Statuses', 'value' => ''],
+            ['label' => 'Broken', 'value' => 'broken'],
+            ['label' => 'Redirect', 'value' => 'redirect'],
+            ['label' => 'Working', 'value' => 'working'],
+            ['label' => 'Server Error', 'value' => 'server_error'],
+            ['label' => 'Timeout', 'value' => 'timeout'],
+            ['label' => 'DNS Error', 'value' => 'dns_error'],
+        ];
+    }
+
     protected function defineRules(): array
     {
         return [
@@ -60,6 +80,7 @@ class Settings extends Model
             [['scanFrequency'], 'in', 'range' => ['manual', 'daily', 'weekly', 'monthly']],
             [['checkExternalLinks', 'spiderEnabled', 'scanOnEntrySave'], 'boolean'],
             [['notificationEmails', 'ignorePatterns', 'userAgent', 'emailLayoutTemplate'], 'string'],
+            [['defaultStatusFilter'], 'in', 'range' => array_column($this->getStatusFilterOptions(), 'value')],
             [['timeout'], 'integer', 'max' => 60],
             [['maxRetries'], 'integer', 'max' => 10],
             [['maxPagesToSpider'], 'integer', 'max' => 10000],

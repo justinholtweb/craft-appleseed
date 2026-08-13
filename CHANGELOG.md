@@ -1,5 +1,20 @@
 # Changelog
 
+## 5.2.0 - 2026-08-13
+
+### Added
+
+- New "Default Status Filter" setting (`defaultStatusFilter`) controlling which status the dashboard results table is filtered by when you first open it — set it to Broken to land straight on the links that need attention. The filter dropdown still switches to any status from there.
+
+### Fixed
+
+- Scans no longer fail with `Data too long for column 'linkText'` when a link wraps a block of content. A link around a card with a heading and summary produced link text thousands of characters long, which overflowed the column and aborted the whole scan. Link text is now whitespace-collapsed and capped at 500 characters wherever it's discovered — spidered pages previously applied no limit at all.
+- The results pagination no longer renders every page number, which pushed the pager off the side of the page and made it unusable once a scan turned up more than a few thousand links. It now shows the first and last pages, the two either side of the current one, and Prev/Next links, and wraps rather than overflowing.
+- Pagination links now carry the active sort and direction, so paging no longer resets the sort order.
+- Long link text is truncated in the results table instead of stretching the column; the full text is available on hover.
+- The "Scan Batch Size" setting is now saved. It was rendered on the settings page but never read from the submitted form, so edits to it were silently discarded.
+- Filtering the results table no longer resets the sort order.
+
 ## 5.1.1 - 2026-08-12
 
 ### Fixed

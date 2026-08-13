@@ -171,3 +171,16 @@
     class: 'code',
     errors: settings.getErrors('ignorePatterns'),
 }) }}
+
+<hr>
+<h2>Dashboard</h2>
+
+{{ forms.selectField({
+    label: 'Default Status Filter',
+    instructions: 'Which status the results table is filtered by when you first open the dashboard. You can still switch to any other status from the filter dropdown.',
+    id: 'defaultStatusFilter',
+    name: 'defaultStatusFilter',
+    value: settings.defaultStatusFilter,
+    options: settings.statusFilterOptions,
+    errors: settings.getErrors('defaultStatusFilter'),
+}) }}

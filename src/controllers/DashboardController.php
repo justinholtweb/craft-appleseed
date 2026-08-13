@@ -6,6 +6,7 @@ use Craft;
 use craft\web\Controller;
 use justinholtweb\appleseed\jobs\CheckLinksJob;
 use justinholtweb\appleseed\jobs\ScanJob;
+use justinholtweb\appleseed\models\Settings;
 use justinholtweb\appleseed\Plugin;
 use justinholtweb\appleseed\records\LinkRecord;
 use yii\web\NotFoundHttpException;
@@ -34,9 +35,14 @@ class DashboardController extends Controller
         $lastScan = $plugin->reporting->getLastCompletedScan();
         $runningScan = $plugin->reporting->getRunningScan();
 
-        $statusFilter = Craft::$app->getRequest()->getQueryParam('status');
+        /** @var Settings $settings */
+        $settings = $plugin->getSettings();
+
+        // An absent `status` param means "not chosen yet", so fall back to the configured
+        // default. An empty one is an explicit "All Statuses" and is left alone.
+        $statusFilter = Craft::$app->getRequest()->getQueryParam('status') ?? $settings->defaultStatusFilter;
         $search = Craft::$app->getRequest()->getQueryParam('search');
-        $page = (int) (Craft::$app->getRequest()->getQueryParam('page', 1));
+        $page = max(1, (int) Craft::$app->getRequest()->getQueryParam('page', 1));
         $sort = Craft::$app->getRequest()->getQueryParam('sort', 'status');
         $direction = Craft::$app->getRequest()->getQueryParam('direction', 'asc');
 
@@ -56,6 +62,7 @@ class DashboardController extends Controller
             'direction' => $direction,
             'page' => $page,
             'sectionsByType' => $sectionsByType,
+            'statusOptions' => $settings->getStatusFilterOptions(),
         ]);
     }
 

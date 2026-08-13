@@ -125,6 +125,15 @@
     text-decoration: underline;
 }
 
+.appleseed-linktext-cell__text {
+    display: inline-block;
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: bottom;
+}
+
 /* Status badges */
 .appleseed-status {
     display: inline-block;
@@ -184,6 +193,8 @@
 /* Pagination */
 .appleseed-pagination {
     display: flex;
+    flex-wrap: wrap;
+    align-items: center;
     gap: 4px;
     justify-content: center;
     padding: 12px 0;
@@ -210,6 +221,18 @@
 .appleseed-pagination__current {
     background: #3b82f6;
     color: #fff;
+}
+
+.appleseed-pagination__gap {
+    padding: 4px 2px;
+    font-size: 13px;
+    color: #8f98a3;
+}
+
+.appleseed-pagination__count {
+    margin-left: 8px;
+    font-size: 12px;
+    color: #8f98a3;
 }
 
 /* Detail page */
