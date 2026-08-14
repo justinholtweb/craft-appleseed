@@ -7,7 +7,7 @@ Appleseed proactively discovers and checks every link across your Craft CMS site
 - **Hybrid link discovery** -- scans entry fields in the database *and* spiders rendered pages
 - **Smart HTTP checking** -- HEAD-first with GET fallback, retries with exponential backoff, per-domain rate limiting
 - **CP Dashboard** -- summary cards, filterable results table, detail views, ignore/rescan actions
-- **Scheduled scans** -- daily, weekly, or monthly automatic scanning
+- **Scheduled scans** -- optional daily, weekly, or monthly automatic scanning
 - **Entry-save scanning** -- optionally check links whenever an entry is saved
 - **Email notifications** -- get notified when broken links exceed your threshold
 - **CSV export** -- download results for offline review
@@ -55,7 +55,7 @@ return [
     'spiderEnabled' => true,
     'maxPagesToSpider' => 200,
     'scanBatchSize' => 50,
-    'scanFrequency' => 'weekly', // manual, daily, weekly, monthly
+    'scanFrequency' => 'manual', // manual, daily, weekly, monthly
     'scanOnEntrySave' => false,
     'notificationEmails' => '',
     'notificationThreshold' => 1,
@@ -67,6 +67,20 @@ return [
     'defaultStatusFilter' => '',
 ];
 ```
+
+### Scheduled scans
+
+Scans are manual by default -- nothing is queued when the plugin is installed or updated. Pick a
+`scanFrequency` of `daily`, `weekly`, or `monthly` to scan automatically. The schedule is measured
+from your most recent completed scan, so run one from the dashboard (or with `php craft
+appleseed/scan`) to start the clock.
+
+### Read-only settings
+
+When [`allowAdminChanges`](https://craftcms.com/docs/5.x/reference/config/general.html#allowadminchanges)
+is disabled for the environment, the settings screen renders read-only: the fields show the active
+configuration but can't be edited, and saving is rejected. Set your values in `config/appleseed.php`
+on those environments.
 
 ## License
 

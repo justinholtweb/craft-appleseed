@@ -83,7 +83,7 @@ URLs are deduped by `urlHash = SHA-256(url)`. One link can have many sources (en
 | `spiderEnabled` | bool | true | Enable BFS page crawling |
 | `maxPagesToSpider` | int | 200 | Page limit for spider (1–10000) |
 | `scanBatchSize` | int | 50 | Links checked per queue job (1–1000) |
-| `scanFrequency` | string | weekly | manual / daily / weekly / monthly |
+| `scanFrequency` | string | manual | manual / daily / weekly / monthly (scheduled scans only run once a scan has completed) |
 | `scanOnEntrySave` | bool | false | Auto-scan entry on save |
 | `notificationEmails` | string | '' | Comma-separated recipient list |
 | `notificationThreshold` | int | 1 | Min broken links to trigger email |
@@ -134,7 +134,7 @@ craft appleseed/check-url https://example.com       # Check one URL, report stat
 | `UrlManager::EVENT_REGISTER_CP_URL_RULES` | CP request | Register 4 CP routes |
 | `UserPermissions::EVENT_REGISTER_PERMISSIONS` | CP request | Register 3 permissions |
 | `Entry::EVENT_AFTER_SAVE` | Always (if enabled) | Queue `ScanEntryJob` (skips drafts/revisions) |
-| On init (CP only) | CP request | Check if scheduled scan is due, push `ScanJob` |
+| On init (CP only) | CP request | Check if scheduled scan is due, push `ScanJob`. Never cold-starts: skipped until a scan has completed |
 
 ## Working With This Codebase
 
@@ -163,8 +163,13 @@ if ($field instanceof YourFieldType) {
 
 1. Add property to `Settings.php` with default
 2. Add validation rule in `defineRules()`
-3. Add form field in `settings/_index.twig` using `forms.*Field()` macro
+3. Add form field in `settings/_fields.twig` using `forms.*Field()` macro, passing `disabled: readOnly`
 4. Add mapping in `SettingsController::actionSave()`
+
+`settings/_fields.twig` is shared by the plugin's own settings page and Craft's Settings → Plugins
+page, and renders read-only when `allowAdminChanges` is off — every field must honour `readOnly`.
+`SettingsController::actionSave()` throws a 403 in that state rather than attempting a project
+config write.
 
 ### Adding a new controller action
 

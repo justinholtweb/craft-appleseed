@@ -1,5 +1,15 @@
 # Changelog
 
+## 5.2.1 - 2026-08-14
+
+### Changed
+
+- Scans are no longer started automatically when the plugin is installed or updated. The `scanFrequency` default is now `manual`, and a scheduled scan is never queued until at least one scan has completed — the schedule is measured from your most recent completed scan, so run one from the dashboard (or `php craft appleseed/scan`) to start the clock. Sites that have explicitly saved a frequency and completed a scan keep their existing schedule; sites that were relying on the old `weekly` default without ever saving settings will need to choose a frequency to keep scanning on a schedule.
+
+### Fixed
+
+- The settings screen no longer offers editable fields on environments where Craft's `allowAdminChanges` is disabled. Saving there attempted a project config write and failed with an error; the page now renders read-only with a note pointing at `config/appleseed.php`, and `settings/save` returns a 403 instead of erroring.
+
 ## 5.2.0 - 2026-08-13
 
 ### Added

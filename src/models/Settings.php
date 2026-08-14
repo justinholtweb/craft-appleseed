@@ -15,7 +15,7 @@ class Settings extends Model
     public bool $spiderEnabled = true;
     public int $maxPagesToSpider = 200;
     public int $scanBatchSize = 50;
-    public string $scanFrequency = 'weekly';
+    public string $scanFrequency = 'manual';
     public bool $scanOnEntrySave = false;
     public string $notificationEmails = '';
     public int $notificationThreshold = 1;

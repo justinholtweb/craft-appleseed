@@ -94,6 +94,7 @@ class Plugin extends BasePlugin
     {
         return Craft::$app->getView()->renderTemplate('appleseed/settings/_fields', [
             'settings' => $this->getSettings(),
+            'readOnly' => !Craft::$app->getConfig()->getGeneral()->allowAdminChanges,
         ]);
     }
 
@@ -197,6 +198,13 @@ class Plugin extends BasePlugin
             return;
         }
 
+        // Never cold-start. Until a scan has been run manually (or from the console),
+        // there's no baseline to schedule from, and queueing one off the back of an
+        // install or update isn't something anyone asked for.
+        if ($lastScan === null || $lastScan->completedAt === null) {
+            return;
+        }
+
         $intervalMap = [
             'daily' => 86400,
             'weekly' => 604800,
@@ -208,8 +216,7 @@ class Plugin extends BasePlugin
             return;
         }
 
-        $isDue = $lastScan === null
-            || (time() - strtotime($lastScan->completedAt)) >= $interval;
+        $isDue = (time() - strtotime($lastScan->completedAt)) >= $interval;
 
         if ($isDue) {
             Craft::$app->getQueue()->push(new ScanJob());

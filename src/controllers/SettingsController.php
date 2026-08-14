@@ -6,6 +6,7 @@ use Craft;
 use craft\web\Controller;
 use justinholtweb\appleseed\models\Settings;
 use justinholtweb\appleseed\Plugin;
+use yii\web\ForbiddenHttpException;
 use yii\web\Response;
 
 class SettingsController extends Controller
@@ -30,6 +31,7 @@ class SettingsController extends Controller
 
         return $this->renderTemplate('appleseed/settings/_index', [
             'settings' => $plugin->getSettings(),
+            'readOnly' => !Craft::$app->getConfig()->getGeneral()->allowAdminChanges,
         ]);
     }
 
@@ -39,6 +41,12 @@ class SettingsController extends Controller
     public function actionSave(): ?Response
     {
         $this->requirePostRequest();
+
+        // Saving settings writes to project config, which is off-limits when
+        // administrative changes are disabled for the environment.
+        if (!Craft::$app->getConfig()->getGeneral()->allowAdminChanges) {
+            throw new ForbiddenHttpException('Administrative changes are disabled on this environment.');
+        }
 
         $plugin = Plugin::getInstance();
         /** @var Settings $settings */
@@ -65,6 +73,7 @@ class SettingsController extends Controller
             Craft::$app->getSession()->setError(Craft::t('appleseed', 'Couldn’t save settings.'));
             return $this->renderTemplate('appleseed/settings/_index', [
                 'settings' => $settings,
+                'readOnly' => false,
             ]);
         }
 

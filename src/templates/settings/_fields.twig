@@ -1,5 +1,8 @@
 {% import "_includes/forms" as forms %}
 
+{# Rendered read-only when administrative changes are disabled for the environment. #}
+{% set readOnly = readOnly ?? false %}
+
 <h2>Link Checking</h2>
 
 {{ forms.lightswitchField({
@@ -8,6 +11,7 @@
     id: 'checkExternalLinks',
     name: 'checkExternalLinks',
     on: settings.checkExternalLinks,
+    disabled: readOnly,
 }) }}
 
 {{ forms.textField({
@@ -21,6 +25,7 @@
     max: 60,
     size: 5,
     errors: settings.getErrors('timeout'),
+    disabled: readOnly,
 }) }}
 
 {{ forms.textField({
@@ -34,6 +39,7 @@
     max: 10,
     size: 5,
     errors: settings.getErrors('maxRetries'),
+    disabled: readOnly,
 }) }}
 
 {{ forms.textField({
@@ -48,6 +54,7 @@
     max: '100',
     size: 5,
     errors: settings.getErrors('rateLimitPerSecond'),
+    disabled: readOnly,
 }) }}
 
 {{ forms.textField({
@@ -61,6 +68,7 @@
     max: 1000,
     size: 5,
     errors: settings.getErrors('scanBatchSize'),
+    disabled: readOnly,
 }) }}
 
 {{ forms.autosuggestField({
@@ -71,6 +79,7 @@
     value: settings.userAgent,
     suggestEnvVars: true,
     errors: settings.getErrors('userAgent'),
+    disabled: readOnly,
 }) }}
 
 <hr>
@@ -82,6 +91,7 @@
     id: 'spiderEnabled',
     name: 'spiderEnabled',
     on: settings.spiderEnabled,
+    disabled: readOnly,
 }) }}
 
 {{ forms.textField({
@@ -95,6 +105,7 @@
     max: 10000,
     size: 5,
     errors: settings.getErrors('maxPagesToSpider'),
+    disabled: readOnly,
 }) }}
 
 <hr>
@@ -102,7 +113,7 @@
 
 {{ forms.selectField({
     label: 'Scan Frequency',
-    instructions: 'How often to automatically run a full scan.',
+    instructions: 'How often to automatically run a full scan. Scheduled scans start counting from your first completed scan — run one from the dashboard to get the schedule going.',
     id: 'scanFrequency',
     name: 'scanFrequency',
     value: settings.scanFrequency,
@@ -112,6 +123,7 @@
         { label: 'Weekly', value: 'weekly' },
         { label: 'Monthly', value: 'monthly' },
     ],
+    disabled: readOnly,
 }) }}
 
 {{ forms.lightswitchField({
@@ -120,6 +132,7 @@
     id: 'scanOnEntrySave',
     name: 'scanOnEntrySave',
     on: settings.scanOnEntrySave,
+    disabled: readOnly,
 }) }}
 
 <hr>
@@ -133,6 +146,7 @@
     value: settings.notificationEmails,
     suggestEnvVars: true,
     errors: settings.getErrors('notificationEmails'),
+    disabled: readOnly,
 }) }}
 
 {{ forms.textField({
@@ -145,6 +159,7 @@
     min: 1,
     size: 5,
     errors: settings.getErrors('notificationThreshold'),
+    disabled: readOnly,
 }) }}
 
 {{ forms.autosuggestField({
@@ -156,6 +171,7 @@
     suggestEnvVars: true,
     suggestTemplates: true,
     errors: settings.getErrors('emailLayoutTemplate'),
+    disabled: readOnly,
 }) }}
 
 <hr>
@@ -170,6 +186,7 @@
     rows: 6,
     class: 'code',
     errors: settings.getErrors('ignorePatterns'),
+    disabled: readOnly,
 }) }}
 
 <hr>
@@ -183,4 +200,5 @@
     value: settings.defaultStatusFilter,
     options: settings.statusFilterOptions,
     errors: settings.getErrors('defaultStatusFilter'),
+    disabled: readOnly,
 }) }}

@@ -5,16 +5,26 @@
 
 {% block content %}
 
-<form method="post" accept-charset="UTF-8">
-    {{ csrfInput() }}
-    {{ actionInput('appleseed/settings/save') }}
-    {{ redirectInput('appleseed/settings') }}
-
-    {% include 'appleseed/settings/_fields' with { settings: settings } %}
-
-    <div class="btngroup">
-        <input type="submit" class="btn submit" value="Save">
+{% if readOnly %}
+    <div class="readable">
+        <blockquote class="note warning">
+            <p>Administrative changes are disabled on this environment, so these settings are read-only. Set them in your <code>config/appleseed.php</code> file, or enable <code>allowAdminChanges</code> to edit them here.</p>
+        </blockquote>
     </div>
-</form>
+
+    {% include 'appleseed/settings/_fields' with { settings: settings, readOnly: true } %}
+{% else %}
+    <form method="post" accept-charset="UTF-8">
+        {{ csrfInput() }}
+        {{ actionInput('appleseed/settings/save') }}
+        {{ redirectInput('appleseed/settings') }}
+
+        {% include 'appleseed/settings/_fields' with { settings: settings, readOnly: false } %}
+
+        <div class="btngroup">
+            <input type="submit" class="btn submit" value="Save">
+        </div>
+    </form>
+{% endif %}
 
 {% endblock %}
