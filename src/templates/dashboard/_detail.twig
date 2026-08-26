@@ -82,7 +82,7 @@
                     <tr>
                         <td>
                             {% if source.entryCpUrl is defined and source.entryCpUrl %}
-                                <a href="{{ source.entryCpUrl }}">{{ source.entryTitle ?? 'Entry #' ~ source.entryId }}</a>
+                                <a href="{{ source.entryCpUrl }}">{{ source.entryTitle ?? ('Entry #' ~ source.entryId) }}</a>
                             {% elseif source.sourceUrl %}
                                 <a href="{{ source.sourceUrl }}" target="_blank" rel="noopener noreferrer">{{ source.sourceUrl }}</a>
                             {% else %}

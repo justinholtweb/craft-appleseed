@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.2.2 - 2026-08-26
+
+### Fixed
+
+- **The Source column glued the entry title and its ID together**, rendering rows like "Harbour terminal moves to a single scheduling window31279". Twig's `??` binds tighter than `~`, so `a.title ?? 'Entry #' ~ a.id` parses as `(a.title ?? 'Entry #') ~ a.id`. Fixed on both the dashboard and the link detail screen.
+
 ## 5.2.1 - 2026-08-14
 
 ### Changed

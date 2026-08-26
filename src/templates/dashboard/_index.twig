@@ -147,7 +147,7 @@
                             {% if link.sources|length %}
                                 {% set source = link.sources[0] %}
                                 {% if source.entryCpUrl is defined and source.entryCpUrl %}
-                                    <a href="{{ source.entryCpUrl }}">{{ source.entryTitle ?? 'Entry #' ~ source.entryId }}</a>
+                                    <a href="{{ source.entryCpUrl }}">{{ source.entryTitle ?? ('Entry #' ~ source.entryId) }}</a>
                                     {% if source.entrySection is defined and source.entrySection %}
                                         <div class="appleseed-source-section light">{{ source.entrySection }}</div>
                                     {% endif %}
