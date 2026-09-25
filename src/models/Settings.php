@@ -104,6 +104,24 @@ class Settings extends Model
     }
 
     /**
+     * Whether a URL matches one of the ignore patterns. Invalid patterns are skipped.
+     */
+    public function matchesIgnorePattern(string $url): bool
+    {
+        foreach ($this->getIgnorePatternsArray() as $pattern) {
+            try {
+                if (@preg_match($pattern, $url)) {
+                    return true;
+                }
+            } catch (\Throwable) {
+                // Invalid regex, skip
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Get notification emails as an array.
      */
     public function getNotificationEmailsArray(): array

@@ -32,7 +32,7 @@ src/
 ```
 Scanner (orchestrator)
 ├── LinkExtractor  → queries Entry fields, parses HTML with DOMDocument
-├── Spider         → BFS crawl via Guzzle, extracts <a href> and <img src>
+├── Spider         → BFS crawl via Guzzle, extracts <a href> and <img src>; skips nofollow/ignored/honeypot URLs
 ├── LinkChecker    → HEAD-first with GET fallback, exponential backoff, per-domain rate limit
 └── Reporting      → dashboard queries, CSV generation, email via Craft mailer
 ```
@@ -88,7 +88,7 @@ URLs are deduped by `urlHash = SHA-256(url)`. One link can have many sources (en
 | `notificationEmails` | string | '' | Comma-separated recipient list |
 | `notificationThreshold` | int | 1 | Min broken links to trigger email |
 | `emailLayoutTemplate` | string | '' | Optional Twig template wrapping report emails |
-| `ignorePatterns` | string | '' | Newline-separated regex patterns |
+| `ignorePatterns` | string | '' | Newline-separated regex patterns; matching URLs are neither checked nor crawled |
 | `userAgent` | string | 'Appleseed Link Checker (Craft CMS)' | HTTP User-Agent header |
 | `defaultStatusFilter` | string | '' | Status the dashboard filters by on first load |
 
@@ -158,6 +158,13 @@ if ($field instanceof YourFieldType) {
 2. Add CSS class in `appleseed.css` (`.appleseed-status--yourstatus`)
 3. Update `Reporting::getBrokenLinkCount()` if it should count as broken
 4. Add to filter dropdown in `dashboard/_index.twig`
+
+### Honeypots (Black Hole)
+
+`helpers/Honeypot::isTrapUrl()` detects Craft Black Hole's trap path on this install's own sites.
+Trap URLs are never requested — the trap bans the requesting address on any method, HEAD included,
+and the scan runs from the server's own address. Both `Spider` and `LinkChecker` must check it
+before any HTTP request.
 
 ### Adding a new setting
 

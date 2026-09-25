@@ -7,6 +7,7 @@ use craft\base\Component;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\RequestOptions;
+use justinholtweb\appleseed\helpers\Honeypot;
 use justinholtweb\appleseed\models\ScanResult;
 use justinholtweb\appleseed\models\Settings;
 use justinholtweb\appleseed\Plugin;
@@ -23,18 +24,13 @@ class LinkChecker extends Component
         /** @var Settings $settings */
         $settings = Plugin::getInstance()->getSettings();
 
-        // Check ignore patterns
-        foreach ($settings->getIgnorePatternsArray() as $pattern) {
-            try {
-                if (preg_match($pattern, $url)) {
-                    return new ScanResult(
-                        url: $url,
-                        status: 'ignored',
-                    );
-                }
-            } catch (\Throwable) {
-                // Invalid regex, skip
-            }
+        // Never request a honeypot trap -- it bans the scanning server's address on any method,
+        // HEAD included, and every check after that comes back as a 403
+        if (Honeypot::isTrapUrl($url) || $settings->matchesIgnorePattern($url)) {
+            return new ScanResult(
+                url: $url,
+                status: 'ignored',
+            );
         }
 
         // Rate limit per domain

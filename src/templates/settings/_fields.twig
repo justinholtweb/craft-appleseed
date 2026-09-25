@@ -179,7 +179,7 @@
 
 {{ forms.textareaField({
     label: 'Ignore Patterns',
-    instructions: 'One regex pattern per line. URLs matching any pattern will be skipped during checking. Example: `/^https:\/\/example\.com/`',
+    instructions: 'One regex pattern per line. URLs matching any pattern are never requested: they're skipped during checking and the spider won't crawl them. Example: `/^https:\/\/example\.com/`',
     id: 'ignorePatterns',
     name: 'ignorePatterns',
     value: settings.ignorePatterns,

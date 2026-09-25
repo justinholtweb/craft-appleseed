@@ -10,6 +10,7 @@ use GuzzleHttp\RequestOptions;
 use DOMDocument;
 use DOMElement;
 use DOMXPath;
+use justinholtweb\appleseed\helpers\Honeypot;
 use justinholtweb\appleseed\helpers\LinkText;
 use justinholtweb\appleseed\models\Settings;
 use justinholtweb\appleseed\Plugin;
@@ -71,6 +72,11 @@ class Spider extends Component
 
             $visited[$normalizedPageUrl] = true;
 
+            // Ignored URLs are never fetched -- a pattern is how a site keeps the spider out of a path
+            if (Honeypot::isTrapUrl($pageUrl) || $settings->matchesIgnorePattern($pageUrl)) {
+                continue;
+            }
+
             // Rate limit
             if ($rateLimit > 0) {
                 usleep((int) (1_000_000 / $rateLimit));
@@ -96,13 +102,23 @@ class Spider extends Component
             $links = $this->_extractLinksFromHtml($html, $pageUrl);
 
             foreach ($links as $link) {
+                // Don't even record a honeypot trap: checking it would spring it just the same
+                if (Honeypot::isTrapUrl($link['url'])) {
+                    continue;
+                }
+
                 $discoveredLinks[] = [
                     'url' => $link['url'],
                     'sourceUrl' => $pageUrl,
                     'linkText' => $link['linkText'],
                 ];
 
-                // Queue internal links for further crawling
+                // Queue internal links for further crawling. Nofollow links are still checked,
+                // but not followed through the site -- that's what nofollow asks of a crawler
+                if ($link['nofollow'] || $settings->matchesIgnorePattern($link['url'])) {
+                    continue;
+                }
+
                 $linkHost = parse_url($link['url'], PHP_URL_HOST);
                 if ($linkHost && isset($internalHosts[$linkHost]) && !isset($visited[$this->_normalizeUrl($link['url'])])) {
                     // Only queue HTML pages (skip assets)
@@ -123,7 +139,7 @@ class Spider extends Component
     }
 
     /**
-     * @return array<array{url: string, linkText: string|null}>
+     * @return array<array{url: string, linkText: string|null, nofollow: bool}>
      */
     private function _extractLinksFromHtml(string $html, string $baseUrl): array
     {
@@ -147,9 +163,14 @@ class Spider extends Component
                 }
                 $href = trim($anchor->getAttribute('href'));
                 $text = trim($anchor->textContent);
+                $rel = preg_split('/\s+/', strtolower($anchor->getAttribute('rel'))) ?: [];
                 $resolved = $this->_resolveUrl($href, $baseUrl);
                 if ($resolved) {
-                    $links[] = ['url' => $resolved, 'linkText' => LinkText::normalize($text)];
+                    $links[] = [
+                        'url' => $resolved,
+                        'linkText' => LinkText::normalize($text),
+                        'nofollow' => in_array('nofollow', $rel, true),
+                    ];
                 }
             }
         }
@@ -165,7 +186,7 @@ class Spider extends Component
                 $alt = trim($img->getAttribute('alt'));
                 $resolved = $this->_resolveUrl($src, $baseUrl);
                 if ($resolved) {
-                    $links[] = ['url' => $resolved, 'linkText' => LinkText::normalize($alt)];
+                    $links[] = ['url' => $resolved, 'linkText' => LinkText::normalize($alt), 'nofollow' => false];
                 }
             }
         }

@@ -1,5 +1,16 @@
 # Changelog
 
+## 5.2.3 - 2026-09-25
+
+### Fixed
+
+- **Full scans no longer spring Craft Black Hole's trap and get the scanning server banned from its own site.** Black Hole hides a link to its trap on every front-end page; the spider followed it, Black Hole banned the address the scan runs from (`127.0.0.1` on a dev machine), and every page checked after that came back as a 403 and was reported broken. When Black Hole is installed and enabled, its trap path — and everything beneath it — is now never requested by the spider or the link checker, and isn't recorded as a link. ([#7](https://github.com/justinholtweb/craft-appleseed/issues/7))
+- Ignore patterns now apply to the spider as well as the link checker. A page matching a pattern is no longer fetched or crawled, so a pattern can keep the spider out of a path.
+
+### Changed
+
+- The spider no longer follows `rel="nofollow"` links through the site. They're still recorded and checked as links; they just aren't crawled for more links.
+
 ## 5.2.2 - 2026-08-26
 
 ### Fixed
