@@ -3,7 +3,7 @@
     "description": "Broken link checker for Craft CMS 5",
     "type": "craft-plugin",
     "license": "proprietary",
-    "version": "5.2.3",
+    "version": "5.2.5",
     "keywords": [
         "craftcms",
         "broken-links",
@@ -20,7 +20,9 @@
         "craftcms/cms": "^5.0.0"
     },
     "require-dev": {
-        "craftcms/phpstan": "dev-main"
+        "craftcms/phpstan": "dev-main",
+        "phpstan/phpstan": "^1.12 || ^2.2",
+        "craftcms/ecs": "dev-main"
     },
     "autoload": {
         "psr-4": {

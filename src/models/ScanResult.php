@@ -14,7 +14,8 @@ class ScanResult
         public readonly ?string $redirectUrl = null,
         public readonly ?array $redirectChain = null,
         public readonly ?string $errorMessage = null,
-    ) {}
+    ) {
+    }
 
     public function isWorking(): bool
     {

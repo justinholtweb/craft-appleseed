@@ -6,7 +6,6 @@ use Craft;
 use craft\web\Controller;
 use justinholtweb\appleseed\models\Settings;
 use justinholtweb\appleseed\Plugin;
-use yii\web\ForbiddenHttpException;
 use yii\web\Response;
 
 class SettingsController extends Controller
@@ -29,9 +28,14 @@ class SettingsController extends Controller
     {
         $plugin = Plugin::getInstance();
 
+        $user = Craft::$app->getUser();
+
         return $this->renderTemplate('appleseed/settings/_index', [
             'settings' => $plugin->getSettings(),
-            'readOnly' => !Craft::$app->getConfig()->getGeneral()->allowAdminChanges,
+            // Settings are project config. Holders of "Manage Appleseed settings" can read them;
+            // only an admin, where admin changes are allowed, can change them.
+            'readOnly' => !$user->getIsAdmin() || !Craft::$app->getConfig()->getGeneral()->allowAdminChanges,
+            'notAdmin' => !$user->getIsAdmin(),
         ]);
     }
 
@@ -42,11 +46,10 @@ class SettingsController extends Controller
     {
         $this->requirePostRequest();
 
-        // Saving settings writes to project config, which is off-limits when
-        // administrative changes are disabled for the environment.
-        if (!Craft::$app->getConfig()->getGeneral()->allowAdminChanges) {
-            throw new ForbiddenHttpException('Administrative changes are disabled on this environment.');
-        }
+        // Saving writes project config — including which Twig template lays out the report email —
+        // so it needs an admin, on an environment that allows admin changes. Until 5.2.5 the
+        // "Manage Appleseed settings" permission alone was enough.
+        $this->requireAdmin();
 
         $plugin = Plugin::getInstance();
         /** @var Settings $settings */
@@ -74,6 +77,7 @@ class SettingsController extends Controller
             return $this->renderTemplate('appleseed/settings/_index', [
                 'settings' => $settings,
                 'readOnly' => false,
+                'notAdmin' => false,
             ]);
         }
 

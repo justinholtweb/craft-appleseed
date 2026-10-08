@@ -4,12 +4,11 @@ namespace justinholtweb\appleseed\services;
 
 use Craft;
 use craft\base\Component;
-use GuzzleHttp\Client;
-use GuzzleHttp\Exception\GuzzleException;
-use GuzzleHttp\RequestOptions;
 use DOMDocument;
 use DOMElement;
 use DOMXPath;
+use GuzzleHttp\Exception\GuzzleException;
+use GuzzleHttp\RequestOptions;
 use justinholtweb\appleseed\helpers\Honeypot;
 use justinholtweb\appleseed\helpers\LinkText;
 use justinholtweb\appleseed\models\Settings;

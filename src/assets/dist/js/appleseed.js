@@ -31,12 +31,12 @@
 
     if (sectionPickerToggle && sectionPicker) {
         sectionPickerToggle.addEventListener('click', function () {
-            sectionPicker.style.display = sectionPicker.style.display === 'none' ? 'block' : 'none';
+            sectionPicker.classList.toggle('hidden');
         });
 
         if (sectionPickerCancel) {
             sectionPickerCancel.addEventListener('click', function () {
-                sectionPicker.style.display = 'none';
+                sectionPicker.classList.add('hidden');
             });
         }
     }
@@ -80,7 +80,7 @@
             })
                 .then(function () {
                     runSectionScanBtn.textContent = 'Scan Queued';
-                    sectionPicker.style.display = 'none';
+                    sectionPicker.classList.add('hidden');
                     startProgressPolling();
                 })
                 .catch(function (error) {
@@ -100,7 +100,7 @@
 
     function startProgressPolling() {
         if (progressEl) {
-            progressEl.style.display = 'block';
+            progressEl.classList.remove('hidden');
         }
 
         pollInterval = setInterval(function () {
@@ -120,7 +120,7 @@
                         pollInterval = null;
 
                         if (progressEl) {
-                            progressEl.style.display = 'none';
+                            progressEl.classList.add('hidden');
                         }
 
                         // Reload page to show fresh results
@@ -131,7 +131,7 @@
                     clearInterval(pollInterval);
                     pollInterval = null;
                     if (progressEl) {
-                        progressEl.style.display = 'none';
+                        progressEl.classList.add('hidden');
                     }
                 });
         }, 3000);
@@ -205,6 +205,15 @@
                 });
         });
     });
+
+    // The status filter submits on change. Wired here rather than in an inline onchange, so the
+    // markup carries no script and the select is Craft's own.
+    var statusFilter = document.getElementById('appleseed-status-filter');
+    if (statusFilter && statusFilter.form) {
+        statusFilter.addEventListener('change', function () {
+            statusFilter.form.submit();
+        });
+    }
 
     // Auto-start polling if a scan is already running
     var scanActive = document.getElementById('appleseed-scan-active');

@@ -82,6 +82,17 @@ is disabled for the environment, the settings screen renders read-only: the fiel
 configuration but can't be edited, and saving is rejected. Set your values in `config/appleseed.php`
 on those environments.
 
+Only admins can change settings. Users with the "Manage Appleseed settings" permission see them
+read-only, because settings are project config — including the template that lays out the report
+email.
+
+### What gets checked
+
+Appleseed only requests `http` and `https` URLs whose host is one of your Craft sites or resolves to
+public addresses. Links to `localhost`, private networks (`10.x`, `192.168.x`, …) or cloud metadata
+endpoints are recorded as not checked, with the reason, and a redirect into one of those is stopped
+at the hop. Your own sites' hosts are always checked, even when they resolve to a private address.
+
 ## License
 
 MIT

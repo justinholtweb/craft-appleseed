@@ -1,5 +1,29 @@
 # Changelog
 
+## 5.2.5 - 2026-10-07
+
+> {warning} Only admins can now save Appleseed's settings — the "Manage Appleseed settings" permission shows them read-only. And links to private or internal addresses (`localhost`, `10.x`, `192.168.x`, cloud metadata and the like) are no longer requested: they're recorded as not checked. Links to your own sites' hosts are still checked wherever those resolve.
+
+### Security
+
+- **The link checker no longer requests private or internal addresses.** Any URL in content was fetched and its status reported, so an editor could point a link at a cloud metadata endpoint or an intranet host and have the server request it. A URL is now refused unless it is `http`/`https` and its host is one of your Craft sites or resolves only to public addresses — checked before the request and again at every redirect, so a public page can't bounce the checker inward. Refused links are recorded as not checked, with the reason.
+- **Saving settings requires an admin.** Settings are project config, including the Twig template that lays out the report email, and "Manage Appleseed settings" was enough to change them. That permission now shows the settings read-only; saving needs an admin, on an environment that allows admin changes.
+
+### Fixed
+
+- **Appleseed's permissions survived only CP requests.** They were registered only for control panel requests, and Craft discards permission names it doesn't recognise when saving — so a console save, `project-config/apply` during a deploy included, could strip them from users and groups. They're now registered on every request.
+- The Appleseed nav item only lists the screens the user can open; someone with only "Manage Appleseed settings" no longer gets a Dashboard link that 403s, and vice versa.
+
+### Changed
+
+- The dashboard follows the control panel's theme. Its stylesheet used hard-coded light colours; it now uses Craft's colour variables, so it reads correctly in dark mode and high-contrast mode. The status filter is Craft's own select, inline styles are gone from the CP templates, and the search placeholder is translatable.
+
+## 5.2.4 - 2026-10-07
+
+### Fixed
+
+- The settings screen failed to render: an unescaped apostrophe in the Ignore Patterns instructions was a Twig syntax error. Thanks [@rosskenney](https://github.com/rosskenney). ([#9](https://github.com/justinholtweb/craft-appleseed/pull/9))
+
 ## 5.2.3 - 2026-09-25
 
 ### Fixed

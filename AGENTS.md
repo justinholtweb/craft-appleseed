@@ -117,7 +117,7 @@ URLs are deduped by `urlHash = SHA-256(url)`. One link can have many sources (en
 
 - `appleseed-viewDashboard` — View broken link dashboard
 - `appleseed-runScans` — Run link scans, ignore/rescan links
-- `appleseed-manageSettings` — Manage plugin settings
+- `appleseed-manageSettings` — View plugin settings (read-only); saving needs an admin (5.2.5)
 
 ## Console Commands
 
@@ -132,7 +132,7 @@ craft appleseed/check-url https://example.com       # Check one URL, report stat
 | Event | When | Action |
 |-------|------|--------|
 | `UrlManager::EVENT_REGISTER_CP_URL_RULES` | CP request | Register 4 CP routes |
-| `UserPermissions::EVENT_REGISTER_PERMISSIONS` | CP request | Register 3 permissions |
+| `UserPermissions::EVENT_REGISTER_PERMISSIONS` | Always | Register 3 permissions — never CP-only: Craft drops unknown permission names on save, so a console `project-config/apply` would strip them |
 | `Entry::EVENT_AFTER_SAVE` | Always (if enabled) | Queue `ScanEntryJob` (skips drafts/revisions) |
 | On init (CP only) | CP request | Check if scheduled scan is due, push `ScanJob`. Never cold-starts: skipped until a scan has completed |
 
@@ -175,8 +175,8 @@ before any HTTP request.
 
 `settings/_fields.twig` is shared by the plugin's own settings page and Craft's Settings → Plugins
 page, and renders read-only when `allowAdminChanges` is off — every field must honour `readOnly`.
-`SettingsController::actionSave()` throws a 403 in that state rather than attempting a project
-config write.
+`SettingsController::actionSave()` calls `requireAdmin()`, which 403s for non-admins and where
+admin changes are off; the page renders read-only for both.
 
 ### Adding a new controller action
 
@@ -189,6 +189,26 @@ config write.
 1. Bump `Plugin::$schemaVersion`
 2. Create a new migration in `src/migrations/` (e.g., `m240101_000000_add_column.php`)
 3. Update corresponding ActiveRecord class if needed
+
+## Outbound requests
+
+Every URL the link checker fetches goes through `helpers\UrlGuard::refusal()` first (http/https
+only; site hosts allowed; anything else must resolve only to public addresses), and the Guzzle
+client's `on_redirect` is `UrlGuard::onRedirect`, which throws `UrlRefusedException` on an
+internal hop. A refused URL is stored as `ignored` with the reason — not retried.
+
+## CP UI
+
+Use Craft's colour variables (`var(--gray-500)`, `var(--link-color)`…), never hex, so the dashboard
+follows dark and high-contrast themes; no inline `style=` in CP templates — toggle the `hidden`
+class; use `forms.*` macros for controls.
+
+## Automated tests
+
+```sh
+docker exec -w /var/www/html ddev-plugin-testing-web php /var/www/craft-appleseed/tests/integration/security.php  # 23 checks
+docker exec -w /sites/craft-appleseed ddev-phpstan-runner-web bash -c 'vendor/bin/phpstan analyse --memory-limit=1G && vendor/bin/ecs check'
+```
 
 ## Testing Checklist
 

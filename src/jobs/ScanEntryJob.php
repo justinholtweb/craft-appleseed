@@ -14,7 +14,7 @@ class ScanEntryJob extends BaseJob
     {
         $plugin = Plugin::getInstance();
 
-        $progressCallback = function (string $message, float $progress) use ($queue) {
+        $progressCallback = function(string $message, float $progress) use ($queue) {
             $this->setProgress($queue, $progress, $message);
         };
 

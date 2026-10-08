@@ -8,6 +8,8 @@ use GuzzleHttp\Client;
 use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\RequestOptions;
 use justinholtweb\appleseed\helpers\Honeypot;
+use justinholtweb\appleseed\helpers\UrlGuard;
+use justinholtweb\appleseed\helpers\UrlRefusedException;
 use justinholtweb\appleseed\models\ScanResult;
 use justinholtweb\appleseed\models\Settings;
 use justinholtweb\appleseed\Plugin;
@@ -30,6 +32,15 @@ class LinkChecker extends Component
             return new ScanResult(
                 url: $url,
                 status: 'ignored',
+            );
+        }
+
+        // Never request an internal address an editor typed into content — see UrlGuard.
+        if (($refusal = UrlGuard::refusal($url)) !== null) {
+            return new ScanResult(
+                url: $url,
+                status: 'ignored',
+                errorMessage: $refusal,
             );
         }
 
@@ -58,6 +69,13 @@ class LinkChecker extends Component
                 }
 
                 return $this->_buildResult($url, $response);
+            } catch (UrlRefusedException $e) {
+                // Refused at a redirect hop: there is nothing to retry.
+                return new ScanResult(
+                    url: $url,
+                    status: 'ignored',
+                    errorMessage: $e->getMessage(),
+                );
             } catch (ConnectException $e) {
                 $lastException = $e;
             } catch (\Throwable $e) {
@@ -162,6 +180,9 @@ class LinkChecker extends Component
                 RequestOptions::ALLOW_REDIRECTS => [
                     'max' => 10,
                     'track_redirects' => true,
+                    // A public URL that redirects to an internal one is refused at the hop, not
+                    // followed: the check above only saw the first address.
+                    'on_redirect' => [UrlGuard::class, 'onRedirect'],
                 ],
                 RequestOptions::VERIFY => true,
                 RequestOptions::HEADERS => [

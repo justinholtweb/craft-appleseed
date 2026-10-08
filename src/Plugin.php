@@ -3,22 +3,22 @@
 namespace justinholtweb\appleseed;
 
 use Craft;
-use craft\base\Plugin as BasePlugin;
 use craft\base\Model;
-use craft\events\RegisterUrlRulesEvent;
-use craft\events\RegisterUserPermissionsEvent;
+use craft\base\Plugin as BasePlugin;
 use craft\elements\Entry;
 use craft\events\ModelEvent;
-use craft\web\UrlManager;
+use craft\events\RegisterUrlRulesEvent;
+use craft\events\RegisterUserPermissionsEvent;
 use craft\services\UserPermissions;
-use justinholtweb\appleseed\models\Settings;
-use justinholtweb\appleseed\services\LinkExtractor;
-use justinholtweb\appleseed\services\LinkChecker;
-use justinholtweb\appleseed\services\Spider;
-use justinholtweb\appleseed\services\Scanner;
-use justinholtweb\appleseed\services\Reporting;
-use justinholtweb\appleseed\jobs\ScanJob;
+use craft\web\UrlManager;
 use justinholtweb\appleseed\jobs\ScanEntryJob;
+use justinholtweb\appleseed\jobs\ScanJob;
+use justinholtweb\appleseed\models\Settings;
+use justinholtweb\appleseed\services\LinkChecker;
+use justinholtweb\appleseed\services\LinkExtractor;
+use justinholtweb\appleseed\services\Reporting;
+use justinholtweb\appleseed\services\Scanner;
+use justinholtweb\appleseed\services\Spider;
 use yii\base\Event;
 
 /**
@@ -53,9 +53,13 @@ class Plugin extends BasePlugin
     {
         parent::init();
 
+        // Registered on every request: Craft discards permission names it doesn't know when it saves
+        // them, so registering only for CP requests let a console save — `project-config/apply`
+        // included — strip Appleseed's permissions from users and groups.
+        $this->_registerPermissions();
+
         if (Craft::$app->getRequest()->getIsCpRequest()) {
             $this->_registerCpRoutes();
-            $this->_registerPermissions();
         }
 
         $this->_registerEntryListeners();
@@ -67,10 +71,17 @@ class Plugin extends BasePlugin
         $item = parent::getCpNavItem();
         $item['label'] = Craft::t('appleseed', 'Appleseed');
 
-        $item['subnav'] = [
-            'dashboard' => ['label' => Craft::t('appleseed', 'Dashboard'), 'url' => 'appleseed/dashboard'],
-            'settings' => ['label' => Craft::t('appleseed', 'Settings'), 'url' => 'appleseed/settings'],
-        ];
+        // Only the screens this user can open.
+        $user = Craft::$app->getUser();
+        $item['subnav'] = [];
+
+        if ($user->checkPermission('appleseed-viewDashboard')) {
+            $item['subnav']['dashboard'] = ['label' => Craft::t('appleseed', 'Dashboard'), 'url' => 'appleseed/dashboard'];
+        }
+
+        if ($user->checkPermission('appleseed-manageSettings')) {
+            $item['subnav']['settings'] = ['label' => Craft::t('appleseed', 'Settings'), 'url' => 'appleseed/settings'];
+        }
 
         // Badge count of broken links
         try {
@@ -103,7 +114,7 @@ class Plugin extends BasePlugin
         Event::on(
             UrlManager::class,
             UrlManager::EVENT_REGISTER_CP_URL_RULES,
-            function (RegisterUrlRulesEvent $event) {
+            function(RegisterUrlRulesEvent $event) {
                 $event->rules['appleseed'] = 'appleseed/dashboard/index';
                 $event->rules['appleseed/dashboard'] = 'appleseed/dashboard/index';
                 $event->rules['appleseed/dashboard/detail/<linkId:\d+>'] = 'appleseed/dashboard/detail';
@@ -118,7 +129,7 @@ class Plugin extends BasePlugin
         Event::on(
             UserPermissions::class,
             UserPermissions::EVENT_REGISTER_PERMISSIONS,
-            function (RegisterUserPermissionsEvent $event) {
+            function(RegisterUserPermissionsEvent $event) {
                 $event->permissions[] = [
                     'heading' => Craft::t('appleseed', 'Appleseed'),
                     'permissions' => [
@@ -149,7 +160,7 @@ class Plugin extends BasePlugin
         Event::on(
             Entry::class,
             Entry::EVENT_AFTER_SAVE,
-            function (ModelEvent $event) {
+            function(ModelEvent $event) {
                 /** @var Entry $entry */
                 $entry = $event->sender;
 

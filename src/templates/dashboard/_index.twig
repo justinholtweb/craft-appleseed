@@ -1,4 +1,5 @@
 {% extends "_layouts/cp" %}
+{% import '_includes/forms' as forms %}
 
 {% set title = 'Appleseed' %}
 {% set selectedSubnavItem = 'dashboard' %}
@@ -8,7 +9,7 @@
 {% block content %}
 
 {% if runningScan %}
-<div id="appleseed-scan-active" data-running="1" style="display:none"></div>
+<div id="appleseed-scan-active" class="hidden" data-running="1"></div>
 {% endif %}
 
 {# Summary Cards #}
@@ -50,7 +51,7 @@
 </div>
 
 {# Section Scope Picker #}
-<div class="appleseed-section-picker" id="appleseed-section-picker" style="display: none;">
+<div class="appleseed-section-picker hidden" id="appleseed-section-picker">
     <div class="appleseed-section-picker__inner">
         <div class="appleseed-section-picker__header">
             <h3>Select sections to scan</h3>
@@ -84,7 +85,7 @@
 </div>
 
 {# Scan Progress Bar (hidden by default) #}
-<div class="appleseed-progress" id="appleseed-progress" style="display: none;">
+<div class="appleseed-progress hidden" id="appleseed-progress">
     <div class="appleseed-progress__bar">
         <div class="appleseed-progress__fill" id="appleseed-progress-fill"></div>
     </div>
@@ -97,16 +98,15 @@
         <input type="hidden" name="sort" value="{{ sort }}">
         <input type="hidden" name="direction" value="{{ direction }}">
         <div class="appleseed-filters__row">
-            <div class="select">
-                <select name="status" onchange="this.form.submit()">
-                    {% for option in statusOptions %}
-                        <option value="{{ option.value }}" {{ statusFilter == option.value ? 'selected' }}>{{ option.label }}</option>
-                    {% endfor %}
-                </select>
-            </div>
+            {{ forms.select({
+                id: 'appleseed-status-filter',
+                name: 'status',
+                options: statusOptions,
+                value: statusFilter,
+            }) }}
 
             <div class="flex-grow texticon search icon clearable">
-                <input type="text" name="search" class="text fullwidth" placeholder="Search URLs..." value="{{ search }}" autocomplete="off">
+                <input type="text" name="search" class="text fullwidth" placeholder="{{ 'Search URLs…'|t('appleseed') }}" value="{{ search }}" autocomplete="off">
                 {% if search %}<button class="clear-btn" title="Clear" aria-label="Clear"></button>{% endif %}
             </div>
         </div>

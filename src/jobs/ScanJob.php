@@ -28,7 +28,7 @@ class ScanJob extends BaseJob
         /** @var Settings $settings */
         $settings = $plugin->getSettings();
 
-        $progressCallback = function (string $message, float $progress) use ($queue) {
+        $progressCallback = function(string $message, float $progress) use ($queue) {
             $this->setProgress($queue, $progress, $message);
         };
 

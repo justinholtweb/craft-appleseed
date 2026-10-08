@@ -66,7 +66,7 @@ class ScanController extends Controller
 
         $plugin = Plugin::getInstance();
 
-        $progressCallback = function (string $message, float $progress) {
+        $progressCallback = function(string $message, float $progress) {
             $this->stdout("\r  {$message}");
         };
 
@@ -109,7 +109,7 @@ class ScanController extends Controller
 
         $plugin = Plugin::getInstance();
 
-        $progressCallback = function (string $message, float $progress) {
+        $progressCallback = function(string $message, float $progress) {
             $this->stdout("\r  {$message}");
         };
 
