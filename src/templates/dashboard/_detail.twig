@@ -30,7 +30,7 @@
 
     {% if link.errorMessage %}
         <div class="appleseed-detail__error">
-            <strong>Error:</strong> {{ link.errorMessage }}
+            <strong>{{ link.status == 'blocked' ? 'Not checked:' : 'Error:' }}</strong> {{ link.errorMessage }}
         </div>
     {% endif %}
 

@@ -168,6 +168,11 @@
     color: var(--red-800);
 }
 
+.appleseed-status--blocked {
+    background: var(--gray-050);
+    color: var(--medium-text-color);
+}
+
 .appleseed-status--unknown {
     background: var(--gray-050);
     color: var(--medium-text-color);

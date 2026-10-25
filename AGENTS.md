@@ -59,7 +59,10 @@ URLs are deduped by `urlHash = SHA-256(url)`. One link can have many sources (en
 
 ### Link Status Values
 
-`working` · `broken` · `redirect` · `server_error` · `timeout` · `dns_error` · `ignored` · `unknown`
+`working` · `broken` · `redirect` · `server_error` · `timeout` · `dns_error` · `blocked` · `ignored` · `unknown`
+
+`blocked` means bot protection answered instead of the site (Cloudflare challenge, Akamai "Access Denied",
+or a non-standard status like LinkedIn's 999). It is not counted as broken.
 
 ## Key Conventions
 

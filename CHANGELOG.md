@@ -1,5 +1,13 @@
 # Changelog
 
+## 5.2.6 - 2026-10-25
+
+### Fixed
+
+- **Links behind bot protection were reported as broken.** Cloudflare's bot challenge and Akamai's "Access Denied" page answer the checker with a 403 whatever the link's real state, and LinkedIn answers with a non-standard 999 that showed as broken with no status code. These links now get a new **Blocked** status — not counted as broken, with its own filter — and the link detail says which protection turned the checker away, so you can check them in a browser. ([#10](https://github.com/justinholtweb/craft-appleseed/issues/10))
+- **Sign-on redirects were reported as broken.** Sites that set a cookie and redirect back to the same URL (iModules alumni sites, among others) looped until "Will not follow more than 10 redirects", because the checker kept no cookies. Each link is now checked with its own cookie jar. ([#10](https://github.com/justinholtweb/craft-appleseed/issues/10))
+- `craft appleseed/check-url` now exits with an error for a 5xx response, matching the dashboard, which already counted server errors as broken.
+
 ## 5.2.5 - 2026-10-07
 
 > {warning} Only admins can now save Appleseed's settings — the "Manage Appleseed settings" permission shows them read-only. And links to private or internal addresses (`localhost`, `10.x`, `192.168.x`, cloud metadata and the like) are no longer requested: they're recorded as not checked. Links to your own sites' hosts are still checked wherever those resolve.

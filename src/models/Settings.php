@@ -69,6 +69,7 @@ class Settings extends Model
             ['label' => 'Server Error', 'value' => 'server_error'],
             ['label' => 'Timeout', 'value' => 'timeout'],
             ['label' => 'DNS Error', 'value' => 'dns_error'],
+            ['label' => 'Blocked', 'value' => 'blocked'],
         ];
     }
 

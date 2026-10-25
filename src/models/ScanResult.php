@@ -24,7 +24,7 @@ class ScanResult
 
     public function isBroken(): bool
     {
-        return in_array($this->status, ['broken', 'dns_error', 'timeout'], true);
+        return in_array($this->status, ['broken', 'dns_error', 'timeout', 'server_error'], true);
     }
 
     public function isRedirect(): bool
