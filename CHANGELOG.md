@@ -1,5 +1,101 @@
 # Changelog
 
+## 6.0.0-beta.1
+
+Appleseed for Craft CMS 6, rebuilt as a native Craft 6 plugin. It runs on Laravel and has no
+dependency on the Yii 2 adapter. Craft 6 is in beta, and so is this release. Update to Appleseed
+5.3.0 before upgrading Craft, and see [the upgrade guide](https://github.com/justinholtweb/craft-appleseed/blob/6.0.0/UPGRADING.md).
+
+Everything in 5.3.0 carries over: database and spider discovery, the link checker and its SSRF
+guard, every scan type, source replacement and pruning, newly-broken tracking, cancelling, the
+dashboard, link detail, entry sidebar, widget, notifications, webhook, GraphQL (same schema), MCP
+(same eleven tools and output), the console commands and every setting.
+
+### Added
+
+- **Faster checking.** Links are checked with Laravel's HTTP client, several hosts at once
+  (`Http::pool()`), one request per host per round, and never faster than `rateLimitPerSecond` to
+  any one host. The rate limit is now shared through the cache by every queue worker checking a
+  scan, not counted per process.
+- **Scans as Laravel job batches.** A queued scan's links are checked as a `Bus::batch()` of
+  `scanBatchSize`-link jobs that several queue workers can share. The dashboard's progress comes
+  from the batch, and cancelling a scan cancels it.
+- **One scan at a time, guaranteed.** Starting or queueing a site scan takes an atomic cache lock,
+  so the dashboard, the console, MCP and the schedule can't start two at once, even on separate
+  servers. A queued scan that hasn't started yet counts.
+- **Scheduled scans on Laravel's scheduler**: `appleseed:scan:scheduled` runs hourly and queues a
+  scan when one is due. Control panel visits still start due scans on hosting without a scheduler.
+- **Scan history pruning** with Laravel's `model:prune`, daily, after `scanHistoryDays` (new
+  setting, default 90). Links and their results are kept.
+- **Control panel notifications** (`notifyCpUsers`, new setting): everyone who can run link scans is
+  notified in the control panel when a scan crosses the threshold.
+- The webhook is sent from the queue and retried with backoff (10s, 1m, 5m, 15m). Email and Slack
+  are a queued, retried Laravel notification.
+- Laravel events: `ScanCompleted`, `DefiningFieldLinks` and the new `LinkBroke`, dispatched the
+  moment a check finds a link newly broken.
+- An `appleseed` log channel (`storage/logs/appleseed-*.log`), which `config/logging.php` can
+  redefine.
+- `--json` on `appleseed:scan:status` and `appleseed:check-url`; `--queue` on
+  `appleseed:scan:entry`.
+- The dashboard filters by entry (`?entryId=`), linked from the entry sidebar, and the results table
+  sorts by URL, status, code and last checked.
+
+### Changed
+
+- Console commands are Artisan commands: `php artisan appleseed:scan [--type=…] [--queue]`,
+  `appleseed:scan:entry`, `:status`, `:cancel`, `:scheduled`, `:prune`, `appleseed:links:export`,
+  `appleseed:links:recheck` and `appleseed:check-url`. The Craft 5 names (`php craft
+  appleseed/scan/incremental` …) still work.
+- The settings use Craft 6's standard plugin settings screen; Appleseed → Settings shows them
+  read-only to holders of “Manage Appleseed settings”. Every key is unchanged.
+- The entry sidebar panel is a “Links” row in the entry editor's metadata (Craft 6's editor has no
+  sidebar-HTML hook), with the same contents and “Check this entry again”.
+- Extending: `LinkExtractor::EVENT_DEFINE_FIELD_LINKS` is the `DefiningFieldLinks` event and
+  `Scanner::EVENT_AFTER_SCAN` is `ScanCompleted`, both in `JustinHoltWeb\Appleseed\Events`.
+- The spider's page limit counts every page it fetches, not only pages that turned out to be HTML.
+- `appleseed/scan/preview-email` and `appleseed/scan/test-email` are `appleseed:scan:email`
+  (`--output=…`, or `--send [--to=…]`); the old names still work.
+- PHP 8.5 and Craft 6.0.0-beta.1 or later.
+
+### Removed
+
+- The Craft 5 `Url` field type no longer exists in Craft 6 (Craft 5.3 converted URL fields to Link
+  fields), so its special case is gone; Link fields are read as before.
+
+## 5.3.0 - 2026-11-26
+
+> {note} Notifications are no longer sent after a scan of a single entry (the scan that runs when an entry is saved with “Scan on entry save” on). Before, every save that touched a broken link emailed everyone on the list.
+
+### Added
+
+- **MCP tools.** On Craft 5.12.1 and later, Appleseed adds eleven tools to Craft's MCP server, so an AI assistant can read link results, look up an entry's links, check a URL before it goes into content, run, cancel and follow scans, and ignore links — as the signed-in user, with the same permissions as the control panel. Nothing is registered on earlier Craft versions.
+- **GraphQL.** `appleseedLinks`, `appleseedLinkCount`, `appleseedLink`, `appleseedSummary`, `appleseedScans` and `appleseedScan`, behind a new “Query Appleseed links and scans” scope and never on the public schema. Links filter by status, host, URL, site and entry; a source's `entry` resolves through Craft's own entry query, so it respects the schema's section access.
+- **A custom sidebar label and icon**, in the plugin settings: a label, an icon from Craft's icon picker, or a pasted SVG (sanitised every time it's drawn).
+- **Entry sidebar panel.** The entry editor lists the entry's broken links, redirects and blocked links from the last scan that read it, with a “Check this entry again” button.
+- **“Broken Links” dashboard widget**, with counts and the most recently broken links, optionally for one site.
+- **Scan changed entries** (incremental scans), from the dashboard, `appleseed/scan/incremental`, or as the scheduled scan type.
+- **Re-check broken links** without reading any content, from the dashboard or `appleseed/scan/recheck-broken`.
+- **Cancel a running scan**, from the dashboard or `appleseed/scan/cancel`.
+- **Slack notifications** and a **signed JSON webhook** after every scan.
+- **“Only newly broken links”** notifications. Appleseed now records when each link started failing, and each scan counts how many links broke during it.
+- The dashboard lists the entries and hosts with the most broken links, filters by site and host, and has an Ignored filter for un-ignoring. The CSV export follows the dashboard's filters.
+- The link detail screen says who ignored a link and when, and since when it's been broken.
+- **Excluded fields**: field handles whose links aren't collected.
+- Links in third-party link fields that expose their URL (Hyper, Typed Link and similar) are collected, as are links in CKEditor nested entries.
+- `LinkExtractor::EVENT_DEFINE_FIELD_LINKS`, to collect links from other field types, and `Scanner::EVENT_AFTER_SCAN`.
+- Console commands `appleseed/scan/status`, `appleseed/scan/prune`, `appleseed/links/export` and `appleseed/links/recheck`, and `--queue` on the scan commands.
+
+### Fixed
+
+- **Link sources piled up.** Every scan added a fresh copy of each place a link was found and nothing removed the old ones, so links showed up as found many times over on the detail screen and in the CSV, and links removed from content stayed on the dashboard forever. Each scan now replaces the sources of what it read, links found nowhere any more are removed (ignored links are kept, so the decision survives), and the update removes the duplicates already stored.
+- Links in Matrix fields were recorded against the nested entry, which has no useful title or edit screen, and nested entries were also read a second time on their own. They're now recorded against the entry that owns them, with the field path (`blocks.body`).
+- **Scheduled scans never ran on busy sites with “Scan on entry save” on**: the schedule was measured from the last completed scan of any kind, so every entry save pushed it back. It's now measured from the last scan that read the whole site.
+- A scan whose queue job died stayed “running” forever, blocking scheduled scans and keeping the dashboard's progress bar up. Scans untouched for two hours are now marked failed.
+- Saving the settings threw an error when a setting named an environment variable that isn't set on that environment.
+- The dashboard and CSV export no longer run a query (and an entry lookup) per link.
+- Credentials in a link (`https://user:password@…`) are no longer stored, shown or sent in notifications.
+- Users without “Run link scans” no longer see scan, re-check and ignore buttons that would fail.
+
 ## 5.2.6 - 2026-10-25
 
 ### Fixed

@@ -1,305 +1,454 @@
 <?php
 
-namespace justinholtweb\appleseed\services;
+declare(strict_types=1);
 
-use Craft;
-use craft\base\Component;
-use craft\base\FieldInterface;
-use craft\elements\Entry;
-use craft\fields\Link as LinkField;
-use craft\fields\Matrix as MatrixField;
-use craft\fields\Table as TableField;
-use craft\fields\Url as UrlField;
+namespace JustinHoltWeb\Appleseed\Services;
+
+use CraftCms\Cms\Element\Queries\Contracts\ElementQueryInterface;
+use CraftCms\Cms\Entry\Elements\Entry;
+use CraftCms\Cms\Field\Contracts\FieldInterface;
+use CraftCms\Cms\Field\Link as LinkField;
+use CraftCms\Cms\Field\Table as TableField;
+use CraftCms\Cms\Support\Facades\Elements;
+use CraftCms\Cms\Support\Facades\Sites;
+use DateTimeInterface;
 use DOMDocument;
 use DOMElement;
 use DOMXPath;
-use justinholtweb\appleseed\helpers\LinkText;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Log;
+use JustinHoltWeb\Appleseed\Events\DefiningFieldLinks;
+use JustinHoltWeb\Appleseed\Models\Settings;
+use JustinHoltWeb\Appleseed\Plugin;
+use JustinHoltWeb\Appleseed\Support\LinkText;
+use JustinHoltWeb\Appleseed\Support\LinkUrl;
+use Throwable;
 
-class LinkExtractor extends Component
+/**
+ * Reads links out of entries' fields: rich text (CKEditor and anything with `getRawContent()`),
+ * Link, Table, Matrix and CKEditor nested entries, and third-party link fields whose values know
+ * their URL (`getUrl()`, or `getLinks()` of things that do).
+ *
+ * Nested entries are read through their owner and recorded against it, with the field path
+ * (`blocks.body`), so every link points at an entry an editor can open.
+ */
+class LinkExtractor
 {
-    /** @var string Matches an element reference tag, e.g. `{entry:123@1:url||https://example.com/page}`. */
-    private const REF_TAG_PATTERN = '/\{\w+\:[^\}]+\}/';
+    /** How deep nested entries (Matrix inside Matrix…) are followed. */
+    private const int MAX_DEPTH = 8;
+
+    /** @var list<array{url: string, entryId: int, siteId: int, fieldHandle: string, linkText: string|null}> */
+    private array $links = [];
 
     /**
-     * Discovered links: [['url' => string, 'entryId' => int, 'siteId' => int, 'fieldHandle' => string, 'linkText' => string|null]]
-     */
-    private array $_links = [];
-
-    /**
-     * Extract all links from all entries across all sites.
+     * Entries read by the last extraction, keyed `"{siteId}:{entryId}"`, including those with no
+     * links, so the scanner can clear sources for links that were removed from them.
      *
-     * @param int[]|null $sectionIds Optional section IDs to limit extraction to.
-     * @return array<array{url: string, entryId: int, siteId: int, fieldHandle: string, linkText: string|null}>
+     * @var array<string, array{entryId: int, siteId: int}>
      */
-    public function extractAllLinks(?callable $progressCallback = null, ?array $sectionIds = null): array
+    private array $processed = [];
+
+    /** @var list<string> */
+    private array $excludedFields = [];
+
+    public function __construct(
+        private readonly Settings $settings,
+    ) {}
+
+    /**
+     * Extract links from every live section entry on every site.
+     *
+     * @param  (callable(int): void)|null  $progress  Called with how many entries have been read.
+     * @param  list<int>|null  $sectionIds  Only these sections.
+     * @param  DateTimeInterface|null  $changedSince  Only entries updated since then.
+     * @return list<array{url: string, entryId: int, siteId: int, fieldHandle: string, linkText: string|null}>
+     */
+    public function extractAllLinks(?callable $progress = null, ?array $sectionIds = null, ?DateTimeInterface $changedSince = null): array
     {
-        $this->_links = [];
+        $this->reset();
+        $total = 0;
 
-        $sites = Craft::$app->getSites()->getAllSites();
-        $totalProcessed = 0;
+        foreach (Sites::getAllSites() as $site) {
+            $query = Entry::find()->siteId($site->id)->status('live');
 
-        foreach ($sites as $site) {
-            $query = Entry::find()
-                ->siteId($site->id)
-                ->status('live')
-                ->limit(null);
-
-            if (!empty($sectionIds)) {
+            // Section entries only. Nested entries (Matrix, CKEditor) are read through their owner,
+            // so their links are recorded against the entry an editor can open.
+            if (! empty($sectionIds)) {
                 $query->sectionId($sectionIds);
+            } else {
+                $query->section('*');
             }
 
-            $totalEntries = $query->count();
-            $offset = 0;
-            $batchSize = 100;
+            if ($changedSince !== null) {
+                $query->dateUpdated('>= '.$changedSince->format(DateTimeInterface::ATOM));
+            }
 
-            while ($offset < $totalEntries) {
-                $entries = (clone $query)
-                    ->offset($offset)
-                    ->limit($batchSize)
-                    ->all();
+            /** @var Entry $entry */
+            foreach ($query->lazyById(100) as $entry) {
+                $this->extractFromEntryInto($entry, $entry, '', 0);
+                $total++;
 
-                foreach ($entries as $entry) {
-                    $this->_extractFromEntry($entry);
-                    $totalProcessed++;
-
-                    if ($progressCallback) {
-                        $progressCallback($totalProcessed);
-                    }
+                if ($progress !== null && $total % 10 === 0) {
+                    $progress($total);
                 }
-
-                $offset += $batchSize;
-
-                // Free memory
-                gc_collect_cycles();
             }
         }
 
-        return $this->_links;
+        if ($progress !== null) {
+            $progress($total);
+        }
+
+        return $this->links;
     }
 
     /**
-     * Extract links from a single entry.
+     * Extract links from one entry.
      *
-     * @return array<array{url: string, entryId: int, siteId: int, fieldHandle: string, linkText: string|null}>
+     * @return list<array{url: string, entryId: int, siteId: int, fieldHandle: string, linkText: string|null}>
      */
     public function extractFromEntry(Entry $entry): array
     {
-        $this->_links = [];
-        $this->_extractFromEntry($entry);
-        return $this->_links;
+        $this->reset();
+        $this->extractFromEntryInto($entry, $entry, '', 0);
+
+        return $this->links;
     }
 
-    private function _extractFromEntry(Entry $entry): void
+    /**
+     * The entries the last extraction read.
+     *
+     * @return list<array{entryId: int, siteId: int}>
+     */
+    public function getProcessedEntries(): array
     {
+        return array_values($this->processed);
+    }
+
+    private function reset(): void
+    {
+        $this->links = [];
+        $this->processed = [];
+        $this->excludedFields = $this->settings->getExcludedFieldsArray();
+    }
+
+    /**
+     * @param  Entry  $entry  The entry whose fields are read.
+     * @param  Entry  $owner  The top-level entry links are recorded against.
+     * @param  string  $path  The field path inside the owner, e.g. `blocks.`, for nested entries.
+     */
+    private function extractFromEntryInto(Entry $entry, Entry $owner, string $path, int $depth): void
+    {
+        if ($entry === $owner) {
+            $this->processed["{$owner->siteId}:{$owner->id}"] = ['entryId' => (int) $owner->id, 'siteId' => (int) $owner->siteId];
+        }
+
         $fieldLayout = $entry->getFieldLayout();
+
         if ($fieldLayout === null) {
             return;
         }
 
         foreach ($fieldLayout->getCustomFields() as $field) {
-            $handle = $field->handle;
+            $handle = (string) $field->handle;
+
+            if ($handle === '' || in_array($handle, $this->excludedFields, true)) {
+                continue;
+            }
 
             try {
-                $this->_extractFromField($entry, $field, $handle);
-            } catch (\Throwable $e) {
-                Craft::warning(
-                    "Appleseed: Error extracting links from entry {$entry->id} field {$handle}: {$e->getMessage()}",
-                    __METHOD__,
-                );
+                $this->extractFromField($entry, $owner, $field, $path.$handle, $depth);
+            } catch (Throwable $e) {
+                Log::channel(Plugin::LOG_CHANNEL)->warning("Couldn’t read links from entry {$entry->id}, field {$handle}: {$e->getMessage()}");
             }
         }
     }
 
-    private function _extractFromField(Entry $entry, FieldInterface $field, string $handle): void
+    private function extractFromField(Entry $entry, Entry $owner, FieldInterface $field, string $handle, int $depth): void
     {
-        $value = $entry->getFieldValue($handle);
+        $value = $entry->getFieldValue((string) $field->handle);
 
-        // CKEditor / Rich Text fields -- have getRawContent() or serialize to string.
-        // Use the *parsed* content so element reference tags (`{entry:123@1:url||...}`)
-        // are resolved to real URLs rather than being treated as literal hrefs.
-        if (is_object($value) && method_exists($value, 'getRawContent')) {
-            if (method_exists($value, 'getParsedContent')) {
-                $html = (string) $value->getParsedContent();
-            } elseif (method_exists($value, '__toString')) {
-                $html = (string) $value;
-            } else {
-                $html = (string) $value->getRawContent();
+        if (Event::hasListeners(DefiningFieldLinks::class)) {
+            event($event = new DefiningFieldLinks($entry, $owner, $field, $value));
+
+            foreach ($event->links as $link) {
+                if (is_string($link['url'] ?? null) && $link['url'] !== '') {
+                    $text = $link['linkText'] ?? null;
+                    $this->addLink($link['url'], $owner, $handle, is_string($text) ? $text : null);
+                }
             }
 
-            $this->_extractFromHtml($html, $entry, $handle);
+            if ($event->skipDefault) {
+                return;
+            }
+        }
+
+        // Rich text (CKEditor and other HTML fields). The *parsed* content, so element reference
+        // tags (`{entry:123@1:url||…}`) are resolved to real URLs rather than read as literal hrefs.
+        if (is_object($value) && method_exists($value, 'getRawContent')) {
+            $html = method_exists($value, 'getParsedContent')
+                ? (string) $value->getParsedContent()
+                : (string) $value->getRawContent();
+
+            $this->extractFromHtml($html, $owner, $handle);
+
+            // CKEditor keeps nested entries alongside the HTML
+            if ($depth < self::MAX_DEPTH && method_exists($value, 'getEntries')) {
+                $this->extractFromNested($value->getEntries(), $owner, "$handle.", $depth);
+            }
+
             return;
         }
 
-        // Link field
         if ($field instanceof LinkField) {
             if ($value !== null) {
-                $url = is_object($value) && method_exists($value, 'getUrl') ? $value->getUrl() : (string) $value;
-                $linkText = is_object($value) && method_exists($value, 'getText') ? $value->getText() : null;
-                $this->_addLink($url, $entry, $handle, $linkText);
-            }
-            return;
-        }
+                $url = is_object($value) && method_exists($value, 'getUrl') ? $value->getUrl() : $value;
+                $text = is_object($value) && method_exists($value, 'getLabel') ? $value->getLabel() : null;
 
-        // URL field
-        if ($field instanceof UrlField) {
-            if (!empty($value)) {
-                $this->_addLink((string) $value, $entry, $handle);
-            }
-            return;
-        }
-
-        // Matrix fields (Craft 5 returns EntryQuery)
-        if ($field instanceof MatrixField) {
-            if ($value !== null) {
-                $nestedEntries = $value->all();
-                foreach ($nestedEntries as $nestedEntry) {
-                    $this->_extractFromEntry($nestedEntry);
+                if (is_string($url)) {
+                    $this->addLink($url, $owner, $handle, is_string($text) ? $text : null);
                 }
             }
+
             return;
         }
 
-        // Table fields
         if ($field instanceof TableField) {
-            if (is_array($value)) {
-                foreach ($value as $row) {
-                    if (!is_array($row)) {
-                        continue;
-                    }
-                    foreach ($row as $cellValue) {
-                        if (is_string($cellValue) && $this->_looksLikeUrl($cellValue)) {
-                            $this->_addLink($cellValue, $entry, $handle);
-                        }
+            foreach (is_iterable($value) ? $value : [] as $row) {
+                foreach (is_array($row) ? $row : [] as $cell) {
+                    if (is_string($cell) && preg_match('/^https?:\/\//i', trim($cell))) {
+                        $this->addLink($cell, $owner, $handle);
                     }
                 }
             }
+
             return;
         }
 
-        // Fallback: if value is a string that contains HTML
+        // Matrix and other nested-entry fields: an entry query, or the entries themselves.
+        if ($value instanceof ElementQueryInterface || $this->isEntryCollection($value)) {
+            if ($depth < self::MAX_DEPTH) {
+                $this->extractFromNested($value, $owner, "$handle.", $depth);
+            }
+
+            return;
+        }
+
+        // Third-party link fields (Hyper, Typed Link and the like): a value, or a collection of
+        // values, that knows its own URL.
+        if ($this->extractFromLinkObjects($value, $owner, $handle)) {
+            return;
+        }
+
+        // Fallback: a string that holds HTML
         if (is_string($value) && str_contains($value, '<a ')) {
-            $this->_extractFromHtml($value, $entry, $handle);
+            $this->extractFromHtml($value, $owner, $handle);
         }
     }
 
-    private function _extractFromHtml(string $html, Entry $entry, string $fieldHandle): void
+    private function extractFromNested(mixed $nested, Entry $owner, string $path, int $depth): void
     {
-        if (empty($html)) {
-            return;
+        $entries = match (true) {
+            $nested instanceof ElementQueryInterface => $nested->status(null)->all(),
+            is_iterable($nested) => $nested,
+            default => [],
+        };
+
+        foreach ($entries as $nestedEntry) {
+            if ($nestedEntry instanceof Entry && $nestedEntry->enabled) {
+                $this->extractFromEntryInto($nestedEntry, $owner, $path, $depth + 1);
+            }
+        }
+    }
+
+    private function isEntryCollection(mixed $value): bool
+    {
+        if (! is_iterable($value) || is_array($value)) {
+            return false;
         }
 
-        libxml_use_internal_errors(true);
-        $doc = new DOMDocument();
-        $doc->loadHTML('<meta charset="utf-8">' . $html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
-        $xpath = new DOMXPath($doc);
+        foreach ($value as $item) {
+            return $item instanceof Entry;
+        }
 
-        // Extract <a href="...">
-        $anchors = $xpath->query('//a[@href]');
-        if ($anchors) {
-            foreach ($anchors as $anchor) {
-                if (!$anchor instanceof DOMElement) {
-                    continue;
+        return false;
+    }
+
+    /**
+     * Records links from a value that has `getUrl()`, or an iterable of them (`getLinks()`).
+     * Returns whether the value was one.
+     */
+    private function extractFromLinkObjects(mixed $value, Entry $owner, string $handle): bool
+    {
+        if (! is_object($value) || $value instanceof ElementQueryInterface) {
+            return false;
+        }
+
+        $items = method_exists($value, 'getUrl') ? [$value] : null;
+
+        if ($items === null && method_exists($value, 'getLinks')) {
+            $links = $value->getLinks();
+            $items = is_iterable($links) ? $links : null;
+        }
+
+        if ($items === null) {
+            return false;
+        }
+
+        foreach ($items as $item) {
+            if (! is_object($item) || ! method_exists($item, 'getUrl')) {
+                continue;
+            }
+
+            $url = $item->getUrl();
+
+            if (! is_string($url) || $url === '') {
+                continue;
+            }
+
+            $text = null;
+
+            foreach (['getText', 'getLinkText', 'getLabel'] as $method) {
+                if (method_exists($item, $method)) {
+                    $candidate = $item->$method();
+                    $text = is_string($candidate) ? $candidate : null;
+                    break;
                 }
-                $url = $anchor->getAttribute('href');
-                $linkText = trim($anchor->textContent);
-                $this->_addLink($url, $entry, $fieldHandle, $linkText ?: null);
+            }
+
+            $this->addLink($url, $owner, $handle, $text);
+        }
+
+        return true;
+    }
+
+    private function extractFromHtml(string $html, Entry $entry, string $fieldHandle): void
+    {
+        foreach (self::linksInHtml($html) as $link) {
+            $this->addLink($link['url'], $entry, $fieldHandle, $link['linkText']);
+        }
+    }
+
+    /**
+     * The `<a href>` and `<img src>` URLs in some HTML, as written.
+     *
+     * @return list<array{url: string, linkText: string|null, nofollow: bool}>
+     */
+    public static function linksInHtml(string $html): array
+    {
+        if (trim($html) === '') {
+            return [];
+        }
+
+        $previous = libxml_use_internal_errors(true);
+        $doc = new DOMDocument;
+        $doc->loadHTML('<meta charset="utf-8">'.$html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD | LIBXML_NONET);
+        $xpath = new DOMXPath($doc);
+        $links = [];
+
+        foreach ($xpath->query('//a[@href]') ?: [] as $anchor) {
+            if ($anchor instanceof DOMElement) {
+                $rel = preg_split('/\s+/', strtolower($anchor->getAttribute('rel'))) ?: [];
+                $links[] = [
+                    'url' => trim($anchor->getAttribute('href')),
+                    'linkText' => LinkText::normalize($anchor->textContent),
+                    'nofollow' => in_array('nofollow', $rel, true),
+                ];
             }
         }
 
-        // Extract <img src="...">
-        $images = $xpath->query('//img[@src]');
-        if ($images) {
-            foreach ($images as $img) {
-                if (!$img instanceof DOMElement) {
-                    continue;
-                }
-                $url = $img->getAttribute('src');
-                $alt = $img->getAttribute('alt');
-                $this->_addLink($url, $entry, $fieldHandle, $alt ?: null);
+        foreach ($xpath->query('//img[@src]') ?: [] as $img) {
+            if ($img instanceof DOMElement) {
+                $links[] = [
+                    'url' => trim($img->getAttribute('src')),
+                    'linkText' => LinkText::normalize($img->getAttribute('alt')),
+                    'nofollow' => false,
+                ];
             }
         }
 
         libxml_clear_errors();
+        libxml_use_internal_errors($previous);
+
+        return $links;
     }
 
-    private function _addLink(string $url, Entry $entry, string $fieldHandle, ?string $linkText = null): void
+    private function addLink(string $url, Entry $entry, string $fieldHandle, ?string $linkText = null): void
     {
-        $url = trim($url);
+        $url = $this->normalize($url, (int) $entry->siteId);
 
-        if (empty($url)) {
+        if ($url === null) {
             return;
         }
 
-        // Resolve any element reference tags that made it through unparsed
-        if (str_contains($url, '{')) {
-            $resolved = $this->_resolveRefTags($url, $entry->siteId);
-            if ($resolved === null) {
-                return;
-            }
-            $url = $resolved;
-        }
-
-        // Skip non-HTTP schemes
-        if (preg_match('/^(mailto:|tel:|javascript:|#)/', $url)) {
-            return;
-        }
-
-        // Resolve relative URLs against site base URL
-        if (!preg_match('/^https?:\/\//i', $url)) {
-            $baseUrl = rtrim(Craft::$app->getSites()->getSiteById($entry->siteId)?->getBaseUrl() ?? '', '/');
-            if (str_starts_with($url, '/')) {
-                $url = $baseUrl . $url;
-            } else {
-                $url = $baseUrl . '/' . $url;
-            }
-        }
-
-        // Normalize: lowercase scheme and host
-        $parsed = parse_url($url);
-        if ($parsed && isset($parsed['host'])) {
-            $normalized = strtolower($parsed['scheme'] ?? 'https') . '://' . strtolower($parsed['host']);
-            if (isset($parsed['port'])) {
-                $normalized .= ':' . $parsed['port'];
-            }
-            $normalized .= $parsed['path'] ?? '/';
-            if (isset($parsed['query'])) {
-                $normalized .= '?' . $parsed['query'];
-            }
-            $url = $normalized;
-        }
-
-        $this->_links[] = [
+        $this->links[] = [
             'url' => $url,
-            'entryId' => $entry->id,
-            'siteId' => $entry->siteId,
+            'entryId' => (int) $entry->id,
+            'siteId' => (int) $entry->siteId,
             'fieldHandle' => $fieldHandle,
             'linkText' => LinkText::normalize($linkText),
         ];
     }
 
     /**
-     * Resolve element reference tags (e.g. `{entry:123@1:url||https://example.com/page}`)
-     * to real URLs.
-     *
-     * Rich text values normally arrive already parsed, but reference tags can still turn
-     * up in plain text, Table, and URL field values. Returns null when a tag can't be
-     * resolved -- the referenced element is gone and there's no fallback URL, so there is
-     * nothing to check.
+     * A URL as Appleseed stores it, or null when it isn't one to check: resolved against the site,
+     * scheme and host lowercased, credentials and fragment dropped. `mailto:`, `tel:` and the like,
+     * and reference tags whose element is gone, are null.
      */
-    private function _resolveRefTags(string $url, ?int $siteId): ?string
+    public function normalize(string $url, int $siteId): ?string
     {
-        $url = trim(Craft::$app->getElements()->parseRefs($url, $siteId));
+        $url = trim($url);
 
-        // parseRefs leaves unresolvable tags in place
-        if (preg_match(self::REF_TAG_PATTERN, $url)) {
+        if ($url === '') {
             return null;
         }
 
-        return $url !== '' ? $url : null;
-    }
+        // Resolve any element reference tags that made it through unparsed
+        if (str_contains($url, '{')) {
+            $url = trim(Elements::parseRefs($url, $siteId));
 
-    private function _looksLikeUrl(string $value): bool
-    {
-        return (bool) preg_match('/^https?:\/\//i', trim($value));
+            // parseRefs leaves unresolvable tags in place
+            if ($url === '' || preg_match(LinkUrl::REF_TAG_PATTERN, $url)) {
+                return null;
+            }
+        }
+
+        if (preg_match('/^(mailto:|tel:|sms:|javascript:|data:|#)/i', $url)) {
+            return null;
+        }
+
+        // Protocol-relative
+        if (str_starts_with($url, '//')) {
+            $url = 'https:'.$url;
+        }
+
+        if (! preg_match('/^https?:\/\//i', $url)) {
+            // Any other scheme (ftp:, skype:…) isn't something to request
+            if (preg_match('/^[a-z][a-z0-9+.-]*:/i', $url)) {
+                return null;
+            }
+
+            $baseUrl = rtrim((string) Sites::getSiteById($siteId)?->getBaseUrl(), '/');
+            $url = $baseUrl.(str_starts_with($url, '/') ? $url : '/'.$url);
+        }
+
+        $parsed = parse_url(LinkUrl::stripCredentials($url));
+
+        if (! is_array($parsed) || ! isset($parsed['host'])) {
+            return null;
+        }
+
+        $normalized = strtolower($parsed['scheme'] ?? 'https').'://'.strtolower($parsed['host']);
+
+        if (isset($parsed['port'])) {
+            $normalized .= ':'.$parsed['port'];
+        }
+
+        $normalized .= $parsed['path'] ?? '/';
+
+        if (isset($parsed['query'])) {
+            $normalized .= '?'.$parsed['query'];
+        }
+
+        return $normalized;
     }
 }

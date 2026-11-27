@@ -1,0 +1,119 @@
+{# One link: its result, redirect chain, who ignored it, and every place it was found. #}
+{% set statusLabels = {
+    working: 'Working'|t('appleseed'), broken: 'Broken'|t('appleseed'), redirect: 'Redirect'|t('appleseed'),
+    server_error: 'Server Error'|t('appleseed'), timeout: 'Timeout'|t('appleseed'), dns_error: 'DNS Error'|t('appleseed'),
+    blocked: 'Blocked'|t('appleseed'), ignored: 'Ignored'|t('appleseed'), unknown: 'Not checked'|t('appleseed'),
+} %}
+
+<div class="appleseed-screen appleseed-detail">
+    <p class="appleseed-flash hidden" role="status" aria-live="polite" data-appleseed-flash></p>
+
+    <div class="appleseed-detail__header">
+        <h2 class="appleseed-detail__url">
+            <a href="{{ link.url }}" target="_blank" rel="noopener noreferrer">{{ link.url }}</a>
+        </h2>
+
+        <div class="appleseed-detail__meta">
+            <span class="appleseed-status appleseed-status--{{ link.status }}">{{ statusLabels[link.status] ?? link.status }}</span>
+            {% if link.statusCode %}<span>HTTP {{ link.statusCode }}</span>{% endif %}
+            {% if link.lastCheckedAt %}
+                <span class="light">{{ 'Last checked: {date}'|t('appleseed', { date: link.lastCheckedAt|datetime('short') }) }}</span>
+            {% endif %}
+            {% if link.firstBrokenAt %}
+                <span class="light">{{ 'Broken since {date}'|t('appleseed', { date: link.firstBrokenAt|datetime('short') }) }}</span>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if link.errorMessage %}
+        <div class="appleseed-detail__error">
+            <strong>{{ link.status in ['blocked', 'ignored'] ? 'Not checked:'|t('appleseed') : 'Error:'|t('appleseed') }}</strong> {{ link.errorMessage }}
+        </div>
+    {% endif %}
+
+    {% if link.redirectUrl %}
+        <p class="appleseed-detail__redirect">
+            <strong>{{ 'Redirects to:'|t('appleseed') }}</strong>
+            <a href="{{ link.redirectUrl }}" target="_blank" rel="noopener noreferrer">{{ link.redirectUrl }}</a>
+        </p>
+    {% endif %}
+
+    {% if link.redirectChain %}
+        <div class="appleseed-detail__chain">
+            <strong>{{ 'Redirect chain:'|t('appleseed') }}</strong>
+            <ol>
+                {% for hop in link.redirectChain %}<li>{{ hop }}</li>{% endfor %}
+            </ol>
+        </div>
+    {% endif %}
+
+    {% if link.isIgnored %}
+        <p class="light">
+            {% if link.ignoredBy %}
+                {{ 'Ignored by {name} on {date}.'|t('appleseed', { name: link.ignoredBy.getName(), date: link.dateIgnored|date('M j, Y') }) }}
+            {% elseif link.dateIgnored %}
+                {{ 'Ignored on {date}.'|t('appleseed', { date: link.dateIgnored|date('M j, Y') }) }}
+            {% else %}
+                {{ 'Ignored.'|t('appleseed') }}
+            {% endif %}
+        </p>
+    {% endif %}
+
+    {% if canScan %}
+        <div class="appleseed-detail__actions">
+            <button type="button" class="btn submit" data-appleseed-link-action="rescan" data-url="{{ cpUrl('appleseed/dashboard/rescan-link') }}" data-link-id="{{ link.id }}">{{ 'Re-check Link'|t('appleseed') }}</button>
+            {% if link.isIgnored %}
+                <button type="button" class="btn" data-appleseed-link-action="unignore" data-url="{{ cpUrl('appleseed/dashboard/unignore-link') }}" data-link-id="{{ link.id }}">{{ 'Un-ignore'|t('appleseed') }}</button>
+            {% else %}
+                <button type="button" class="btn" data-appleseed-link-action="ignore" data-url="{{ cpUrl('appleseed/dashboard/ignore-link') }}" data-link-id="{{ link.id }}">{{ 'Ignore Link'|t('appleseed') }}</button>
+            {% endif %}
+        </div>
+    {% endif %}
+
+    <hr>
+
+    <h3>{{ '{count, plural, =1{Found in # location} other{Found in # locations}}'|t('appleseed', { count: link.sources|length }) }}</h3>
+
+    {% if link.sources|length %}
+        <table class="data fullwidth appleseed-table">
+            <thead>
+                <tr>
+                    <th scope="col">{{ 'Source'|t('appleseed') }}</th>
+                    <th scope="col">{{ 'Section'|t('appleseed') }}</th>
+                    <th scope="col">{{ 'Entry Status'|t('appleseed') }}</th>
+                    <th scope="col">{{ 'Type'|t('appleseed') }}</th>
+                    <th scope="col">{{ 'Field'|t('appleseed') }}</th>
+                    <th scope="col">{{ 'Link Text'|t('appleseed') }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for source in link.sources %}
+                    <tr>
+                        <td>
+                            {% if source.entryCpUrl ?? false %}
+                                <a href="{{ source.entryCpUrl }}">{{ source.entryTitle ?? ('Entry #' ~ source.entryId) }}</a>
+                            {% elseif source.sourceUrl ?? false %}
+                                <a href="{{ source.sourceUrl }}" target="_blank" rel="noopener noreferrer">{{ source.sourceUrl }}</a>
+                            {% elseif source.entryId ?? false %}
+                                {{ 'Entry #' ~ source.entryId }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                        <td>{{ source.entrySection ?? '—' }}</td>
+                        <td>
+                            {% if source.entryStatus ?? false %}
+                                <span class="appleseed-entry-status appleseed-entry-status--{{ source.entryStatus }}">{{ source.entryStatus|title }}</span>
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                        <td><span class="appleseed-source-type">{{ source.sourceType }}</span></td>
+                        <td>{{ source.fieldHandle ?? '—' }}</td>
+                        <td>{{ source.linkText ?? '—' }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+</div>

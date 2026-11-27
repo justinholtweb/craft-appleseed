@@ -1,0 +1,426 @@
+/**
+ * Appleseed control panel styles.
+ *
+ * Craft 6 loads this on every control panel page, so every rule is scoped to an appleseed- class.
+ * Colours come from Craft 6's own tokens (`--c-color-danger-*`, `--c-text-quiet`, `--c-surface-*`),
+ * so the dashboard follows dark mode and high-contrast themes; each has a fallback to the Craft 5
+ * variable and then a plain value, for older or customised control panels.
+ */
+
+.appleseed-screen {
+    --appleseed-border: var(--c-color-border-quiet, var(--hairline-color, rgba(51, 64, 77, 0.15)));
+    --appleseed-quiet: var(--c-text-quiet, var(--medium-text-color, #606d7b));
+    --appleseed-surface: var(--c-surface-sunken, var(--gray-050, #f3f5f7));
+    --appleseed-raised: var(--c-surface-raised, var(--white, #fff));
+    --appleseed-radius: var(--c-radius-md, var(--large-border-radius, 6px));
+    --appleseed-gap: var(--c-spacing-md, 12px);
+}
+
+.appleseed-screen .light,
+.appleseed-entry-panel .light,
+.appleseed-widget .light {
+    color: var(--c-text-quiet, var(--medium-text-color, #606d7b));
+}
+
+.appleseed-screen .visually-hidden,
+.appleseed-entry-panel .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------- flash */
+
+.appleseed-flash {
+    margin: 0 0 var(--appleseed-gap, 12px);
+    padding: 8px 12px;
+    border-radius: var(--c-radius-sm, 4px);
+    background: var(--c-color-success-fill-quiet, var(--green-050, #e7f6ee));
+    color: var(--c-color-success-on-quiet, var(--green-800, #14532d));
+}
+
+.appleseed-flash.is-error {
+    background: var(--c-color-danger-fill-quiet, var(--red-050, #fdecea));
+    color: var(--c-color-danger-on-quiet, var(--red-800, #7f1d1d));
+}
+
+/* ---------------------------------------------------------------- summary */
+
+.appleseed-summary-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: var(--appleseed-gap);
+    margin-bottom: 24px;
+}
+
+.appleseed-card {
+    display: block;
+    padding: 16px;
+    border: 1px solid var(--appleseed-border);
+    border-radius: var(--appleseed-radius);
+    background: var(--appleseed-raised);
+    color: inherit;
+    text-align: center;
+    text-decoration: none;
+}
+
+a.appleseed-card:hover {
+    border-color: var(--c-color-border-normal, var(--gray-300, #9aa5b1));
+}
+
+.appleseed-card__number {
+    font-size: 28px;
+    font-weight: 600;
+    line-height: 1.2;
+}
+
+.appleseed-card__label {
+    color: var(--appleseed-quiet);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.appleseed-card--broken .appleseed-card__number {
+    color: var(--c-color-danger-on-normal, var(--error-color, #cf1124));
+}
+
+.appleseed-card--redirect .appleseed-card__number {
+    color: var(--c-color-warning-on-normal, var(--notice-color, #b45309));
+}
+
+.appleseed-card--working .appleseed-card__number {
+    color: var(--c-color-success-on-normal, var(--success-color, #15803d));
+}
+
+.appleseed-card--blocked .appleseed-card__number {
+    color: var(--c-color-info-on-normal, var(--link-color, #0369a1));
+}
+
+/* ---------------------------------------------------------------- hotspots */
+
+.appleseed-hotspots {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: var(--appleseed-gap);
+    margin-bottom: 24px;
+}
+
+.appleseed-hotspots__panel {
+    padding: 12px 16px;
+    border: 1px solid var(--appleseed-border);
+    border-radius: var(--appleseed-radius);
+}
+
+.appleseed-hotspots__panel h3 {
+    margin: 0 0 8px;
+    font-size: 14px;
+}
+
+.appleseed-hotspots__panel ol {
+    margin: 0;
+    padding-left: 20px;
+    list-style: decimal;
+}
+
+.appleseed-hotspots__panel li {
+    margin: 2px 0;
+}
+
+/* ---------------------------------------------------------------- controls */
+
+.appleseed-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--appleseed-gap);
+    margin-bottom: 16px;
+}
+
+.appleseed-controls__left {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.appleseed-section-picker {
+    margin-bottom: 16px;
+    padding: 16px;
+    border: 1px solid var(--appleseed-border);
+    border-radius: var(--appleseed-radius);
+    background: var(--appleseed-surface);
+}
+
+.appleseed-section-picker__header,
+.appleseed-section-picker__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.appleseed-section-picker__header h3 {
+    margin: 0;
+}
+
+.appleseed-section-picker__groups {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--appleseed-gap);
+    margin: 12px 0;
+}
+
+.appleseed-section-picker__group {
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.appleseed-section-picker__group legend {
+    margin-bottom: 4px;
+    font-weight: 600;
+}
+
+.appleseed-section-picker__item {
+    display: block;
+    margin: 2px 0;
+}
+
+/* ---------------------------------------------------------------- progress */
+
+.appleseed-progress {
+    margin-bottom: 16px;
+}
+
+.appleseed-progress__bar {
+    width: 100%;
+    height: 8px;
+    accent-color: var(--c-color-info-fill-loud, var(--link-color, #0369a1));
+}
+
+/* ---------------------------------------------------------------- filters */
+
+.appleseed-filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.appleseed-select select,
+.appleseed-input {
+    min-height: var(--c-input-height, 34px);
+    padding: 4px 10px;
+    border: 1px solid var(--c-form-control-border-color, var(--hairline-color, rgba(51, 64, 77, 0.25)));
+    border-radius: var(--c-input-radius, var(--small-border-radius, 5px));
+    background: var(--c-input-fill, var(--c-surface-form, var(--white, #fff)));
+    color: inherit;
+    font: inherit;
+}
+
+.appleseed-search {
+    flex: 1 1 220px;
+}
+
+.appleseed-input {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* ---------------------------------------------------------------- table */
+
+.appleseed-table-wrap {
+    overflow-x: auto;
+}
+
+.appleseed-table th a {
+    color: inherit;
+}
+
+.appleseed-url-cell {
+    max-width: 360px;
+    word-break: break-all;
+}
+
+.appleseed-linktext-cell {
+    max-width: 220px;
+}
+
+.appleseed-linktext-cell__text {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.appleseed-source-section,
+.appleseed-more {
+    font-size: 12px;
+}
+
+.appleseed-actions {
+    display: flex;
+    gap: 4px;
+}
+
+/* ---------------------------------------------------------------- statuses */
+
+.appleseed-status {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: var(--c-radius-full, 999px);
+    background: var(--c-color-neutral-fill-quiet, var(--gray-100, #e4e7eb));
+    color: var(--c-color-neutral-on-quiet, var(--text-color, #1f2937));
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.appleseed-status--broken,
+.appleseed-status--server_error,
+.appleseed-status--timeout,
+.appleseed-status--dns_error {
+    background: var(--c-color-danger-fill-quiet, var(--red-050, #fdecea));
+    color: var(--c-color-danger-on-quiet, var(--red-800, #7f1d1d));
+}
+
+.appleseed-status--redirect {
+    background: var(--c-color-warning-fill-quiet, var(--yellow-050, #fef3c7));
+    color: var(--c-color-warning-on-quiet, var(--yellow-800, #78350f));
+}
+
+.appleseed-status--working {
+    background: var(--c-color-success-fill-quiet, var(--green-050, #e7f6ee));
+    color: var(--c-color-success-on-quiet, var(--green-800, #14532d));
+}
+
+.appleseed-status--blocked {
+    background: var(--c-color-info-fill-quiet, var(--blue-050, #e0f2fe));
+    color: var(--c-color-info-on-quiet, var(--blue-800, #0c4a6e));
+}
+
+.appleseed-entry-status {
+    margin-left: 4px;
+    color: var(--c-color-warning-on-normal, var(--notice-color, #b45309));
+    font-size: 11px;
+    text-transform: uppercase;
+}
+
+/* ---------------------------------------------------------------- pagination */
+
+.appleseed-pagination {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin-top: 16px;
+}
+
+.appleseed-pagination__current {
+    font-weight: 600;
+}
+
+.appleseed-pagination__count {
+    margin-left: auto;
+}
+
+/* ---------------------------------------------------------------- detail */
+
+.appleseed-detail__url {
+    word-break: break-all;
+}
+
+.appleseed-detail__meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+}
+
+.appleseed-detail__error {
+    margin: 16px 0;
+    padding: 10px 14px;
+    border-radius: var(--c-radius-sm, 4px);
+    background: var(--c-color-danger-fill-quiet, var(--red-050, #fdecea));
+    color: var(--c-color-danger-on-quiet, var(--red-800, #7f1d1d));
+}
+
+.appleseed-detail__chain ol {
+    padding-left: 20px;
+    list-style: decimal;
+    word-break: break-all;
+}
+
+.appleseed-detail__actions {
+    display: flex;
+    gap: 8px;
+    margin: 16px 0;
+}
+
+.appleseed-source-type {
+    font-family: var(--c-font-mono, var(--mono-font, monospace));
+    font-size: 12px;
+}
+
+/* ---------------------------------------------------------------- entry sidebar */
+
+.appleseed-entry-panel__list {
+    margin: 8px 0;
+    padding: 0;
+    list-style: none;
+}
+
+.appleseed-entry-panel__list li {
+    margin-bottom: 6px;
+}
+
+.appleseed-entry-panel__url {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------- widget */
+
+.appleseed-widget__counts {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.appleseed-widget__count {
+    display: block;
+    padding: 8px;
+    border: 1px solid var(--c-color-border-quiet, var(--hairline-color, rgba(51, 64, 77, 0.15)));
+    border-radius: var(--c-radius-md, 6px);
+    color: inherit;
+    text-align: center;
+    text-decoration: none;
+}
+
+.appleseed-widget__count strong {
+    display: block;
+    font-size: 20px;
+}
+
+.appleseed-widget__count--broken strong {
+    color: var(--c-color-danger-on-normal, var(--error-color, #cf1124));
+}
+
+.appleseed-widget__list {
+    margin: 0 0 12px;
+    padding: 0;
+    list-style: none;
+}
+
+.appleseed-widget__list li {
+    margin-bottom: 6px;
+    word-break: break-all;
+}

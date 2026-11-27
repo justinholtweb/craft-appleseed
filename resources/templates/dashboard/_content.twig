@@ -1,0 +1,309 @@
+{# Appleseed's dashboard. Rendered inside Craft's CP screen (CpScreenResponse::contentTemplate). #}
+{% set statusLabels = {
+    working: 'Working'|t('appleseed'), broken: 'Broken'|t('appleseed'), redirect: 'Redirect'|t('appleseed'),
+    server_error: 'Server Error'|t('appleseed'), timeout: 'Timeout'|t('appleseed'), dns_error: 'DNS Error'|t('appleseed'),
+    blocked: 'Blocked'|t('appleseed'), ignored: 'Ignored'|t('appleseed'), unknown: 'Not checked'|t('appleseed'),
+} %}
+
+<div class="appleseed-screen"
+     data-appleseed-dashboard
+     data-progress-url="{{ cpUrl('appleseed/dashboard/scan-progress') }}"
+     data-running="{{ runningScan ? '1' : '0' }}">
+
+    <p class="appleseed-flash hidden" role="status" aria-live="polite" data-appleseed-flash></p>
+
+    {# Summary #}
+    <div class="appleseed-summary-cards">
+        <div class="appleseed-card">
+            <div class="appleseed-card__number">{{ summary.total }}</div>
+            <div class="appleseed-card__label">{{ 'Total Links'|t('appleseed') }}</div>
+        </div>
+        <a class="appleseed-card appleseed-card--broken" href="{{ cpUrl('appleseed/dashboard', { status: 'broken', siteId: siteId }) }}">
+            <div class="appleseed-card__number">{{ summary.broken }}</div>
+            <div class="appleseed-card__label">{{ 'Broken'|t('appleseed') }}</div>
+        </a>
+        <a class="appleseed-card appleseed-card--redirect" href="{{ cpUrl('appleseed/dashboard', { status: 'redirect', siteId: siteId }) }}">
+            <div class="appleseed-card__number">{{ summary.redirects }}</div>
+            <div class="appleseed-card__label">{{ 'Redirects'|t('appleseed') }}</div>
+        </a>
+        <a class="appleseed-card appleseed-card--working" href="{{ cpUrl('appleseed/dashboard', { status: 'working', siteId: siteId }) }}">
+            <div class="appleseed-card__number">{{ summary.working }}</div>
+            <div class="appleseed-card__label">{{ 'Working'|t('appleseed') }}</div>
+        </a>
+        {% if summary.blocked %}
+            <a class="appleseed-card appleseed-card--blocked" href="{{ cpUrl('appleseed/dashboard', { status: 'blocked', siteId: siteId }) }}">
+                <div class="appleseed-card__number">{{ summary.blocked }}</div>
+                <div class="appleseed-card__label">{{ 'Blocked'|t('appleseed') }}</div>
+            </a>
+        {% endif %}
+    </div>
+
+    {# Where to start: the entries and hosts whose fixes clear the most broken links #}
+    {% if worstHosts|length or worstEntries|length %}
+        <div class="appleseed-hotspots">
+            {% if worstEntries|length %}
+                <div class="appleseed-hotspots__panel">
+                    <h3>{{ 'Entries with the most broken links'|t('appleseed') }}</h3>
+                    <ol>
+                        {% for e in worstEntries %}
+                            <li>
+                                {% if e.cpUrl %}<a href="{{ e.cpUrl }}">{{ e.title ?? ('Entry #' ~ e.entryId) }}</a>{% else %}{{ 'Entry #' ~ e.entryId }}{% endif %}
+                                <span class="light">{{ '{count, plural, =1{# broken} other{# broken}}'|t('appleseed', { count: e.broken }) }}</span>
+                            </li>
+                        {% endfor %}
+                    </ol>
+                </div>
+            {% endif %}
+            {% if worstHosts|length %}
+                <div class="appleseed-hotspots__panel">
+                    <h3>{{ 'Hosts with the most broken links'|t('appleseed') }}</h3>
+                    <ol>
+                        {% for h in worstHosts %}
+                            <li>
+                                <a href="{{ cpUrl('appleseed/dashboard', { status: 'broken', host: h.host, siteId: siteId }) }}">{{ h.host }}</a>
+                                <span class="light">{{ '{count, plural, =1{# broken} other{# broken}}'|t('appleseed', { count: h.broken }) }}</span>
+                            </li>
+                        {% endfor %}
+                    </ol>
+                </div>
+            {% endif %}
+        </div>
+    {% endif %}
+
+    {# Scan controls #}
+    <div class="appleseed-controls">
+        <div class="appleseed-controls__left">
+            {% if canScan %}
+                <button type="button" class="btn submit" data-appleseed-scan="full" data-url="{{ cpUrl('appleseed/dashboard/run-scan') }}">{{ 'Run Full Scan'|t('appleseed') }}</button>
+                <button type="button" class="btn" data-appleseed-scan="incremental" data-url="{{ cpUrl('appleseed/dashboard/run-scan') }}" title="{{ 'Read only the entries changed since the last scan'|t('appleseed') }}">{{ 'Scan Changed Entries'|t('appleseed') }}</button>
+                <button type="button" class="btn" data-appleseed-scan="recheck" data-url="{{ cpUrl('appleseed/dashboard/run-scan') }}" title="{{ 'Check the broken links again, without reading any content'|t('appleseed') }}">{{ 'Re-check Broken'|t('appleseed') }}</button>
+                {% if sectionsByType|length %}
+                    <button type="button" class="btn" data-appleseed-toggle="appleseed-section-picker" aria-controls="appleseed-section-picker" aria-expanded="false">{{ 'Scan Sections…'|t('appleseed') }}</button>
+                {% endif %}
+                <button type="button" class="btn{{ runningScan ? '' : ' hidden' }}" data-appleseed-cancel data-url="{{ cpUrl('appleseed/dashboard/cancel-scan') }}">{{ 'Cancel Scan'|t('appleseed') }}</button>
+            {% endif %}
+            <a href="{{ cpUrl('appleseed/dashboard/export-csv', { status: statusFilter, search: search, host: host, siteId: siteId }) }}" class="btn">{{ 'Export CSV'|t('appleseed') }}</a>
+        </div>
+
+        <div class="appleseed-controls__right">
+            {% if lastScan %}
+                <span class="appleseed-last-scan light">
+                    {{ 'Last scan: {date}'|t('appleseed', { date: lastScan.completedAt|datetime('short') }) }}
+                    &mdash; {{ '{count} broken'|t('appleseed', { count: lastScan.brokenCount }) }}
+                    {%- if lastScan.newBrokenCount %}, {{ '{count} new'|t('appleseed', { count: lastScan.newBrokenCount }) }}{% endif %}
+                </span>
+            {% endif %}
+        </div>
+    </div>
+
+    {# Section picker #}
+    {% if canScan and sectionsByType|length %}
+        <div class="appleseed-section-picker hidden" id="appleseed-section-picker">
+            <div class="appleseed-section-picker__header">
+                <h3>{{ 'Select sections to scan'|t('appleseed') }}</h3>
+                <div>
+                    <button type="button" class="btn small" data-appleseed-select-sections="all">{{ 'Select all'|t('appleseed') }}</button>
+                    <button type="button" class="btn small" data-appleseed-select-sections="none">{{ 'Select none'|t('appleseed') }}</button>
+                </div>
+            </div>
+
+            <div class="appleseed-section-picker__groups">
+                {% set typeLabels = { single: 'Singles'|t('appleseed'), channel: 'Channels'|t('appleseed'), structure: 'Structures'|t('appleseed') } %}
+                {% for type, sections in sectionsByType %}
+                    <fieldset class="appleseed-section-picker__group">
+                        <legend>{{ typeLabels[type] ?? type|title }}</legend>
+                        {% for section in sections %}
+                            <label class="appleseed-section-picker__item">
+                                <input type="checkbox" value="{{ section.id }}" data-appleseed-section>
+                                {{ section.name }}
+                            </label>
+                        {% endfor %}
+                    </fieldset>
+                {% endfor %}
+            </div>
+
+            <div class="appleseed-section-picker__actions">
+                <button type="button" class="btn submit" data-appleseed-scan-sections data-url="{{ cpUrl('appleseed/dashboard/run-scan') }}" data-empty-message="{{ 'Please select at least one section.'|t('appleseed') }}">{{ 'Scan Selected Sections'|t('appleseed') }}</button>
+                <button type="button" class="btn" data-appleseed-toggle="appleseed-section-picker">{{ 'Cancel'|t('appleseed') }}</button>
+            </div>
+        </div>
+    {% endif %}
+
+    {# Progress (shown while a scan runs) #}
+    <div class="appleseed-progress{{ runningScan ? '' : ' hidden' }}" data-appleseed-progress>
+        <progress class="appleseed-progress__bar" max="100" value="{{ runningScan ? runningScan.progressPercent() : 0 }}" data-appleseed-progress-bar></progress>
+        <div class="appleseed-progress__text light" data-appleseed-progress-text>
+            {% if runningScan %}
+                {{ 'Checked {checked} of {total} links ({percent}%)'|t('appleseed', { checked: runningScan.totalLinksChecked, total: runningScan.totalLinksFound, percent: runningScan.progressPercent() }) }}
+            {% else %}
+                {{ 'Scanning…'|t('appleseed') }}
+            {% endif %}
+        </div>
+    </div>
+
+    {# Filters #}
+    <form method="get" action="{{ cpUrl('appleseed/dashboard') }}" class="appleseed-filters">
+        <input type="hidden" name="sort" value="{{ sort }}">
+        <input type="hidden" name="direction" value="{{ direction }}">
+
+        <label class="appleseed-select">
+            <span class="visually-hidden">{{ 'Status'|t('appleseed') }}</span>
+            <select name="status" data-appleseed-autosubmit>
+                {% for option in statusOptions %}
+                    <option value="{{ option.value }}"{{ option.value == statusFilter ? ' selected' }}>{{ option.label }}</option>
+                {% endfor %}
+            </select>
+        </label>
+
+        {% if sites|length > 1 %}
+            <label class="appleseed-select">
+                <span class="visually-hidden">{{ 'Site'|t('appleseed') }}</span>
+                <select name="siteId" data-appleseed-autosubmit>
+                    <option value="">{{ 'All sites'|t('appleseed') }}</option>
+                    {% for s in sites %}
+                        <option value="{{ s.id }}"{{ s.id == siteId ? ' selected' }}>{{ s.getName() }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+        {% endif %}
+
+        {% if hosts|length > 1 or host %}
+            <label class="appleseed-select">
+                <span class="visually-hidden">{{ 'Host'|t('appleseed') }}</span>
+                <select name="host" data-appleseed-autosubmit>
+                    <option value="">{{ 'All hosts'|t('appleseed') }}</option>
+                    {% for h in (host and host not in hosts ? [host] : [])|merge(hosts) %}
+                        <option value="{{ h }}"{{ h == host ? ' selected' }}>{{ h }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+        {% endif %}
+
+        <label class="appleseed-search">
+            <span class="visually-hidden">{{ 'Search URLs'|t('appleseed') }}</span>
+            <input type="search" name="search" class="appleseed-input" placeholder="{{ 'Search URLs…'|t('appleseed') }}" value="{{ search }}" autocomplete="off">
+        </label>
+        <button type="submit" class="btn">{{ 'Filter'|t('appleseed') }}</button>
+    </form>
+
+    {# Results #}
+    {% if results.links|length %}
+        {% set sortParams = { status: statusFilter, search: search, host: host, siteId: siteId } %}
+        <div class="appleseed-table-wrap">
+            <table class="data fullwidth appleseed-table">
+                <thead>
+                    <tr>
+                        {% for column in [
+                            { key: 'url', label: 'URL'|t('appleseed') },
+                            { key: 'status', label: 'Status'|t('appleseed') },
+                            { key: 'statusCode', label: 'Code'|t('appleseed') },
+                        ] %}
+                            <th scope="col">
+                                <a href="{{ cpUrl('appleseed/dashboard', sortParams|merge({ sort: column.key, direction: sort == column.key and direction == 'asc' ? 'desc' : 'asc' })) }}">{{ column.label }}{% if sort == column.key %} {{ direction == 'asc' ? '↑' : '↓' }}{% endif %}</a>
+                            </th>
+                        {% endfor %}
+                        <th scope="col">{{ 'Source'|t('appleseed') }}</th>
+                        <th scope="col">{{ 'Field'|t('appleseed') }}</th>
+                        <th scope="col">{{ 'Link Text'|t('appleseed') }}</th>
+                        <th scope="col">
+                            <a href="{{ cpUrl('appleseed/dashboard', sortParams|merge({ sort: 'lastCheckedAt', direction: sort == 'lastCheckedAt' and direction == 'asc' ? 'desc' : 'asc' })) }}">{{ 'Last Checked'|t('appleseed') }}</a>
+                        </th>
+                        <th scope="col"><span class="visually-hidden">{{ 'Actions'|t('appleseed') }}</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for link in results.links %}
+                        {% set source = link.sources|first %}
+                        <tr>
+                            <td class="appleseed-url-cell">
+                                <a href="{{ cpUrl('appleseed/dashboard/detail/' ~ link.id) }}" title="{{ link.url }}">{{ link.url|length > 60 ? link.url[:60] ~ '…' : link.url }}</a>
+                            </td>
+                            <td><span class="appleseed-status appleseed-status--{{ link.status }}">{{ statusLabels[link.status] ?? link.status }}</span></td>
+                            <td>{{ link.statusCode ?? '—' }}</td>
+                            <td>
+                                {% if source %}
+                                    {% if source.entryCpUrl ?? false %}
+                                        <a href="{{ source.entryCpUrl }}">{{ source.entryTitle ?? ('Entry #' ~ source.entryId) }}</a>
+                                        {% if source.entrySection ?? false %}<div class="appleseed-source-section light">{{ source.entrySection }}</div>{% endif %}
+                                    {% elseif source.sourceUrl ?? false %}
+                                        {{ source.sourceUrl|length > 40 ? source.sourceUrl[:40] ~ '…' : source.sourceUrl }}
+                                    {% elseif source.entryId ?? false %}
+                                        {{ 'Entry #' ~ source.entryId }}
+                                    {% endif %}
+                                    {% if (source.entryStatus ?? 'live') != 'live' %}
+                                        <span class="appleseed-entry-status appleseed-entry-status--{{ source.entryStatus }}">{{ source.entryStatus }}</span>
+                                    {% endif %}
+                                    {% if link.sources|length > 1 %}
+                                        <span class="appleseed-more light">{{ '+{count} more'|t('appleseed', { count: link.sources|length - 1 }) }}</span>
+                                    {% endif %}
+                                {% endif %}
+                            </td>
+                            <td>{{ source.fieldHandle ?? '—' }}</td>
+                            <td class="appleseed-linktext-cell">
+                                {%- set linkText = source.linkText ?? null -%}
+                                {%- if linkText -%}
+                                    <span class="appleseed-linktext-cell__text" title="{{ linkText }}">{{ linkText }}</span>
+                                {%- else -%}
+                                    —
+                                {%- endif -%}
+                            </td>
+                            <td>{{ link.lastCheckedAt ? link.lastCheckedAt|datetime('short') : 'Never'|t('appleseed') }}</td>
+                            <td class="thin">
+                                {% if canScan %}
+                                    <div class="appleseed-actions">
+                                        <button type="button" class="btn small" data-appleseed-link-action="rescan" data-url="{{ cpUrl('appleseed/dashboard/rescan-link') }}" data-link-id="{{ link.id }}" title="{{ 'Re-check'|t('appleseed') }}" aria-label="{{ 'Re-check'|t('appleseed') }}">↻</button>
+                                        {% if link.isIgnored %}
+                                            <button type="button" class="btn small" data-appleseed-link-action="unignore" data-url="{{ cpUrl('appleseed/dashboard/unignore-link') }}" data-link-id="{{ link.id }}" title="{{ 'Stop ignoring'|t('appleseed') }}" aria-label="{{ 'Stop ignoring'|t('appleseed') }}">↺</button>
+                                        {% else %}
+                                            <button type="button" class="btn small" data-appleseed-link-action="ignore" data-url="{{ cpUrl('appleseed/dashboard/ignore-link') }}" data-link-id="{{ link.id }}" title="{{ 'Ignore'|t('appleseed') }}" aria-label="{{ 'Ignore'|t('appleseed') }}">✕</button>
+                                        {% endif %}
+                                    </div>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {# Pagination: the first and last pages, and two either side of the current one #}
+        {% if results.totalPages > 1 %}
+            {% set pageParams = { status: statusFilter, search: search, sort: sort, direction: direction, host: host, siteId: siteId } %}
+            {% set windowStart = max(2, page - 2) %}
+            {% set windowEnd = min(results.totalPages - 1, page + 2) %}
+            {% set pageNums = [1] %}
+            {% if windowStart <= windowEnd %}
+                {% set pageNums = pageNums|merge(range(windowStart, windowEnd)) %}
+            {% endif %}
+            {% set pageNums = pageNums|merge([results.totalPages]) %}
+
+            <nav class="appleseed-pagination" aria-label="{{ 'Pagination'|t('appleseed') }}">
+                {% if page > 1 %}
+                    <a href="{{ cpUrl('appleseed/dashboard', pageParams|merge({ page: page - 1 })) }}" rel="prev">&lsaquo; {{ 'Prev'|t('appleseed') }}</a>
+                {% endif %}
+                {% set prevNum = 0 %}
+                {% for p in pageNums %}
+                    {% if p > prevNum + 1 %}<span class="appleseed-pagination__gap">&hellip;</span>{% endif %}
+                    {% if p == page %}
+                        <span class="appleseed-pagination__current" aria-current="page">{{ p }}</span>
+                    {% else %}
+                        <a href="{{ cpUrl('appleseed/dashboard', pageParams|merge({ page: p })) }}">{{ p }}</a>
+                    {% endif %}
+                    {% set prevNum = p %}
+                {% endfor %}
+                {% if page < results.totalPages %}
+                    <a href="{{ cpUrl('appleseed/dashboard', pageParams|merge({ page: page + 1 })) }}" rel="next">{{ 'Next'|t('appleseed') }} &rsaquo;</a>
+                {% endif %}
+                <span class="appleseed-pagination__count light">{{ '{count, plural, =1{# link} other{# links}}'|t('appleseed', { count: results.total }) }}</span>
+            </nav>
+        {% endif %}
+    {% else %}
+        <div class="zilch appleseed-empty">
+            {% if statusFilter or search or host or siteId %}
+                {{ 'No links match your filters.'|t('appleseed') }}
+            {% else %}
+                {{ 'No links found yet. Run a scan to discover links across your site.'|t('appleseed') }}
+            {% endif %}
+        </div>
+    {% endif %}
+</div>

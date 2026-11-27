@@ -1,258 +1,190 @@
 <?php
 
-namespace justinholtweb\appleseed\services;
+declare(strict_types=1);
 
-use Craft;
-use craft\base\Component;
-use DOMDocument;
-use DOMElement;
-use DOMXPath;
-use GuzzleHttp\Exception\GuzzleException;
-use GuzzleHttp\RequestOptions;
-use justinholtweb\appleseed\helpers\Honeypot;
-use justinholtweb\appleseed\helpers\LinkText;
-use justinholtweb\appleseed\models\Settings;
-use justinholtweb\appleseed\Plugin;
+namespace JustinHoltWeb\Appleseed\Services;
 
-class Spider extends Component
+use CraftCms\Cms\Site\Data\Site;
+use CraftCms\Cms\Support\Facades\Sites;
+use Illuminate\Support\Facades\Http;
+use JustinHoltWeb\Appleseed\Models\Settings;
+use JustinHoltWeb\Appleseed\Support\Honeypot;
+use JustinHoltWeb\Appleseed\Support\HostThrottle;
+use JustinHoltWeb\Appleseed\Support\LinkUrl;
+use Throwable;
+
+/**
+ * A breadth-first crawl of the sites' rendered pages, recording every `<a href>` and `<img src>`.
+ *
+ * Only the sites' own hosts are crawled. `rel="nofollow"` links are recorded but not followed,
+ * ignore patterns keep the spider out of a path, and Black Hole's trap is never requested.
+ */
+class Spider
 {
-    /** @var string Matches an element reference tag, e.g. `{entry:123@1:url||https://example.com/page}`. */
-    private const REF_TAG_PATTERN = '/\{\w+\:[^\}]+\}/';
+    private const string ASSET_EXTENSIONS = '/\.(jpg|jpeg|png|gif|svg|webp|avif|ico|css|js|mjs|pdf|zip|tar|gz|mp4|mp3|webm|woff2?|ttf|eot)$/i';
+
+    public function __construct(
+        private readonly Settings $settings,
+        private readonly HostThrottle $throttle,
+    ) {}
 
     /**
-     * Crawl all sites via BFS, returning discovered links.
-     *
-     * @return array<array{url: string, sourceUrl: string, linkText: string|null}>
+     * @param  (callable(int, int): void)|null  $progress  Called with pages visited and the page limit.
+     * @return list<array{url: string, sourceUrl: string, linkText: string|null}>
      */
-    public function crawl(?callable $progressCallback = null): array
+    public function crawl(?callable $progress = null): array
     {
-        /** @var Settings $settings */
-        $settings = Plugin::getInstance()->getSettings();
-
-        $client = Craft::createGuzzleClient([
-            RequestOptions::TIMEOUT => $settings->timeout,
-            RequestOptions::CONNECT_TIMEOUT => $settings->timeout,
-            RequestOptions::HTTP_ERRORS => false,
-            RequestOptions::ALLOW_REDIRECTS => true,
-            RequestOptions::VERIFY => true,
-            RequestOptions::HEADERS => [
-                'User-Agent' => $settings->getUserAgentParsed(),
-                'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            ],
-        ]);
-
-        $discoveredLinks = [];
+        $discovered = [];
         $visited = [];
         $queue = [];
         $internalHosts = [];
         $pagesVisited = 0;
-        $maxPages = $settings->maxPagesToSpider;
-        $rateLimit = $settings->rateLimitPerSecond;
+        $maxPages = $this->settings->maxPagesToSpider;
 
-        // Seed with all site base URLs
-        foreach (Craft::$app->getSites()->getAllSites() as $site) {
-            $baseUrl = rtrim($site->getBaseUrl(), '/');
-            if (!empty($baseUrl)) {
+        /** @var Site $site */
+        foreach (Sites::getAllSites() as $site) {
+            $baseUrl = rtrim((string) $site->getBaseUrl(), '/');
+
+            if ($baseUrl !== '' && ($host = LinkUrl::host($baseUrl)) !== null) {
                 $queue[] = $baseUrl;
-                $host = parse_url($baseUrl, PHP_URL_HOST);
-                if ($host) {
-                    $internalHosts[$host] = true;
-                }
+                $internalHosts[$host] = true;
             }
         }
 
-        while (!empty($queue) && $pagesVisited < $maxPages) {
-            $pageUrl = array_shift($queue);
-            $normalizedPageUrl = $this->_normalizeUrl($pageUrl);
+        while ($queue !== [] && $pagesVisited < $maxPages) {
+            $pageUrl = (string) array_shift($queue);
+            $key = self::visitKey($pageUrl);
 
-            if (isset($visited[$normalizedPageUrl])) {
+            if (isset($visited[$key])) {
                 continue;
             }
 
-            $visited[$normalizedPageUrl] = true;
+            $visited[$key] = true;
 
-            // Ignored URLs are never fetched -- a pattern is how a site keeps the spider out of a path
-            if (Honeypot::isTrapUrl($pageUrl) || $settings->matchesIgnorePattern($pageUrl)) {
+            // Ignored URLs are never fetched: a pattern is how a site keeps the spider out of a path
+            if (Honeypot::isTrapUrl($pageUrl) || $this->settings->matchesIgnorePattern($pageUrl)) {
                 continue;
             }
 
-            // Rate limit
-            if ($rateLimit > 0) {
-                usleep((int) (1_000_000 / $rateLimit));
-            }
+            $html = $this->fetch($pageUrl);
+            $pagesVisited++;
 
-            try {
-                $response = $client->get($pageUrl);
-            } catch (GuzzleException) {
-                continue;
-            }
+            if ($html !== null) {
+                foreach (LinkExtractor::linksInHtml($html) as $link) {
+                    $url = self::resolve($link['url'], $pageUrl);
 
-            $statusCode = $response->getStatusCode();
-            if ($statusCode < 200 || $statusCode >= 300) {
-                continue;
-            }
+                    // Don't even record a honeypot trap: checking it would spring it just the same
+                    if ($url === null || Honeypot::isTrapUrl($url)) {
+                        continue;
+                    }
 
-            $contentType = $response->getHeaderLine('Content-Type');
-            if (!str_contains($contentType, 'text/html')) {
-                continue;
-            }
+                    $discovered[] = ['url' => $url, 'sourceUrl' => $pageUrl, 'linkText' => $link['linkText']];
 
-            $html = (string) $response->getBody();
-            $links = $this->_extractLinksFromHtml($html, $pageUrl);
+                    // Nofollow links are still checked, but not followed through the site
+                    if ($link['nofollow'] || $this->settings->matchesIgnorePattern($url)) {
+                        continue;
+                    }
 
-            foreach ($links as $link) {
-                // Don't even record a honeypot trap: checking it would spring it just the same
-                if (Honeypot::isTrapUrl($link['url'])) {
-                    continue;
-                }
+                    $host = LinkUrl::host($url);
 
-                $discoveredLinks[] = [
-                    'url' => $link['url'],
-                    'sourceUrl' => $pageUrl,
-                    'linkText' => $link['linkText'],
-                ];
-
-                // Queue internal links for further crawling. Nofollow links are still checked,
-                // but not followed through the site -- that's what nofollow asks of a crawler
-                if ($link['nofollow'] || $settings->matchesIgnorePattern($link['url'])) {
-                    continue;
-                }
-
-                $linkHost = parse_url($link['url'], PHP_URL_HOST);
-                if ($linkHost && isset($internalHosts[$linkHost]) && !isset($visited[$this->_normalizeUrl($link['url'])])) {
-                    // Only queue HTML pages (skip assets)
-                    if (!preg_match('/\.(jpg|jpeg|png|gif|svg|webp|ico|css|js|pdf|zip|tar|gz|mp4|mp3|woff2?|ttf|eot)$/i', parse_url($link['url'], PHP_URL_PATH) ?? '')) {
-                        $queue[] = $link['url'];
+                    if ($host !== null && isset($internalHosts[$host]) && ! isset($visited[self::visitKey($url)])
+                        && ! preg_match(self::ASSET_EXTENSIONS, (string) parse_url($url, PHP_URL_PATH))) {
+                        $queue[] = $url;
                     }
                 }
             }
 
-            $pagesVisited++;
-
-            if ($progressCallback) {
-                $progressCallback($pagesVisited, $maxPages);
+            if ($progress !== null) {
+                $progress($pagesVisited, $maxPages);
             }
         }
 
-        return $discoveredLinks;
+        return $discovered;
     }
 
     /**
-     * @return array<array{url: string, linkText: string|null, nofollow: bool}>
+     * The page's HTML, or null when it isn't a 2xx HTML page.
      */
-    private function _extractLinksFromHtml(string $html, string $baseUrl): array
+    private function fetch(string $url): ?string
     {
-        $links = [];
+        $host = LinkUrl::host($url);
 
-        if (empty($html)) {
-            return $links;
+        if ($host !== null) {
+            $this->throttle->wait($host, $this->settings->rateLimitPerSecond);
         }
 
-        libxml_use_internal_errors(true);
-        $doc = new DOMDocument();
-        $doc->loadHTML($html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD | LIBXML_NOERROR);
-        $xpath = new DOMXPath($doc);
-
-        // <a href>
-        $anchors = $xpath->query('//a[@href]');
-        if ($anchors) {
-            foreach ($anchors as $anchor) {
-                if (!$anchor instanceof DOMElement) {
-                    continue;
-                }
-                $href = trim($anchor->getAttribute('href'));
-                $text = trim($anchor->textContent);
-                $rel = preg_split('/\s+/', strtolower($anchor->getAttribute('rel'))) ?: [];
-                $resolved = $this->_resolveUrl($href, $baseUrl);
-                if ($resolved) {
-                    $links[] = [
-                        'url' => $resolved,
-                        'linkText' => LinkText::normalize($text),
-                        'nofollow' => in_array('nofollow', $rel, true),
-                    ];
-                }
-            }
+        try {
+            $response = Http::timeout($this->settings->timeout)
+                ->connectTimeout($this->settings->timeout)
+                ->withUserAgent($this->settings->getUserAgentParsed())
+                ->accept('text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8')
+                ->get($url);
+        } catch (Throwable) {
+            return null;
         }
 
-        // <img src>
-        $images = $xpath->query('//img[@src]');
-        if ($images) {
-            foreach ($images as $img) {
-                if (!$img instanceof DOMElement) {
-                    continue;
-                }
-                $src = trim($img->getAttribute('src'));
-                $alt = trim($img->getAttribute('alt'));
-                $resolved = $this->_resolveUrl($src, $baseUrl);
-                if ($resolved) {
-                    $links[] = ['url' => $resolved, 'linkText' => LinkText::normalize($alt), 'nofollow' => false];
-                }
-            }
+        if (! $response->successful() || ! str_contains(strtolower($response->header('Content-Type')), 'text/html')) {
+            return null;
         }
 
-        libxml_clear_errors();
-
-        return $links;
+        return $response->body();
     }
 
-    private function _resolveUrl(string $url, string $baseUrl): ?string
+    /**
+     * An href or src from a page, made absolute against the page, without its fragment. Null for
+     * anything that isn't an http(s) link.
+     */
+    public static function resolve(string $url, string $baseUrl): ?string
     {
         $url = trim($url);
 
-        if (empty($url)) {
+        if ($url === '' || preg_match('/^(mailto:|tel:|sms:|javascript:|data:|#)/i', $url)) {
             return null;
         }
 
-        // Skip non-HTTP schemes
-        if (preg_match('/^(mailto:|tel:|javascript:|data:|#)/', $url)) {
+        // Unparsed element reference tags show up when a template outputs raw rich text
+        if (preg_match(LinkUrl::REF_TAG_PATTERN, $url)) {
             return null;
         }
 
-        // Skip unparsed element reference tags (e.g. `{entry:123@1:url}`), which show up
-        // when a template outputs raw rich text -- they aren't URLs we can check
-        if (preg_match(self::REF_TAG_PATTERN, $url)) {
-            return null;
-        }
-
-        // Already absolute
         if (preg_match('/^https?:\/\//i', $url)) {
-            return $this->_stripFragment($url);
+            return self::stripFragment(LinkUrl::stripCredentials($url));
         }
 
-        // Protocol-relative
         if (str_starts_with($url, '//')) {
-            return $this->_stripFragment('https:' . $url);
+            return self::stripFragment(LinkUrl::stripCredentials('https:'.$url));
         }
 
-        // Resolve relative URL
-        $parsedBase = parse_url($baseUrl);
-        if (!$parsedBase || !isset($parsedBase['host'])) {
+        if (preg_match('/^[a-z][a-z0-9+.-]*:/i', $url)) {
             return null;
         }
 
-        $scheme = $parsedBase['scheme'] ?? 'https';
-        $host = $parsedBase['host'];
-        $port = isset($parsedBase['port']) ? ':' . $parsedBase['port'] : '';
+        $base = parse_url($baseUrl);
+
+        if (! is_array($base) || ! isset($base['host'])) {
+            return null;
+        }
+
+        $origin = ($base['scheme'] ?? 'https').'://'.$base['host'].(isset($base['port']) ? ':'.$base['port'] : '');
 
         if (str_starts_with($url, '/')) {
-            return $this->_stripFragment("{$scheme}://{$host}{$port}{$url}");
+            return self::stripFragment($origin.$url);
         }
 
-        $basePath = $parsedBase['path'] ?? '/';
-        $baseDir = rtrim(dirname($basePath), '/');
-        return $this->_stripFragment("{$scheme}://{$host}{$port}{$baseDir}/{$url}");
+        $baseDir = rtrim(dirname($base['path'] ?? '/'), '/');
+
+        return self::stripFragment("{$origin}{$baseDir}/{$url}");
     }
 
-    private function _stripFragment(string $url): string
+    private static function stripFragment(string $url): string
     {
         $pos = strpos($url, '#');
+
         return $pos !== false ? substr($url, 0, $pos) : $url;
     }
 
-    private function _normalizeUrl(string $url): string
+    private static function visitKey(string $url): string
     {
-        $url = $this->_stripFragment($url);
-        $url = rtrim($url, '/');
-        return strtolower($url);
+        return strtolower(rtrim(self::stripFragment($url), '/'));
     }
 }
