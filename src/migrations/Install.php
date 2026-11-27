@@ -3,6 +3,7 @@
 namespace justinholtweb\appleseed\migrations;
 
 use craft\db\Migration;
+use craft\db\Table;
 
 class Install extends Migration
 {
@@ -33,6 +34,7 @@ class Install extends Migration
             'totalLinksFound' => $this->integer()->notNull()->defaultValue(0),
             'totalLinksChecked' => $this->integer()->notNull()->defaultValue(0),
             'brokenCount' => $this->integer()->notNull()->defaultValue(0),
+            'newBrokenCount' => $this->integer()->notNull()->defaultValue(0),
             'redirectCount' => $this->integer()->notNull()->defaultValue(0),
             'workingCount' => $this->integer()->notNull()->defaultValue(0),
             'startedAt' => $this->dateTime(),
@@ -50,14 +52,18 @@ class Install extends Migration
             'id' => $this->primaryKey(),
             'url' => $this->text()->notNull(),
             'urlHash' => $this->char(64)->notNull(),
+            'host' => $this->string(255),
             'statusCode' => $this->smallInteger(),
             'status' => $this->string(20)->notNull()->defaultValue('unknown'),
             'redirectUrl' => $this->text(),
             'redirectChain' => $this->text(),
             'errorMessage' => $this->text(),
             'lastCheckedAt' => $this->dateTime(),
+            'firstBrokenAt' => $this->dateTime(),
             'lastScanId' => $this->integer(),
             'isIgnored' => $this->boolean()->notNull()->defaultValue(false),
+            'ignoredById' => $this->integer(),
+            'dateIgnored' => $this->dateTime(),
             'dateCreated' => $this->dateTime()->notNull(),
             'dateUpdated' => $this->dateTime()->notNull(),
             'uid' => $this->uid(),
@@ -67,6 +73,9 @@ class Install extends Migration
         $this->createIndex(null, '{{%appleseed_links}}', 'status');
         $this->createIndex(null, '{{%appleseed_links}}', 'isIgnored');
         $this->createIndex(null, '{{%appleseed_links}}', 'lastScanId');
+        $this->createIndex(null, '{{%appleseed_links}}', 'host');
+
+        $this->addForeignKey(null, '{{%appleseed_links}}', 'ignoredById', Table::USERS, 'id', 'SET NULL');
 
         $this->addForeignKey(
             null,

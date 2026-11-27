@@ -24,7 +24,9 @@
 
 {% if summary.broken > 0 %}
     <p>
-        <strong>{{ summary.broken }} broken link{{ summary.broken != 1 ? 's' }}</strong> found during this scan.
+        <strong>{{ summary.broken }} broken link{{ summary.broken != 1 ? 's' }}</strong> found during this scan
+        {%- if scan.newBrokenCount ?? 0 %}, <strong>{{ scan.newBrokenCount }}</strong> of them newly broken{% endif %}.
+        {% if onlyNew ?? false %}The links below broke since the scan before.{% endif %}
         <a href="{{ cpUrl }}/appleseed/dashboard?status=broken" style="color: #2563eb;">View in dashboard &rarr;</a>
     </p>
 

@@ -63,7 +63,7 @@ class SettingsController extends Controller
         $settings->spiderEnabled = (bool) $request->getBodyParam('spiderEnabled');
         $settings->maxPagesToSpider = (int) $request->getBodyParam('maxPagesToSpider', 200);
         $settings->scanBatchSize = (int) $request->getBodyParam('scanBatchSize', 50);
-        $settings->scanFrequency = $request->getBodyParam('scanFrequency', 'weekly');
+        $settings->scanFrequency = $request->getBodyParam('scanFrequency', 'manual');
         $settings->scanOnEntrySave = (bool) $request->getBodyParam('scanOnEntrySave');
         $settings->notificationEmails = $request->getBodyParam('notificationEmails', '');
         $settings->notificationThreshold = (int) $request->getBodyParam('notificationThreshold', 1);
@@ -71,6 +71,18 @@ class SettingsController extends Controller
         $settings->userAgent = $request->getBodyParam('userAgent', 'Appleseed Link Checker (Craft CMS)');
         $settings->emailLayoutTemplate = $request->getBodyParam('emailLayoutTemplate', '');
         $settings->defaultStatusFilter = $request->getBodyParam('defaultStatusFilter', '');
+        $settings->scheduledScanType = $request->getBodyParam('scheduledScanType', 'full');
+        $settings->notifyOnlyNew = (bool) $request->getBodyParam('notifyOnlyNew');
+        $settings->slackWebhookUrl = trim((string) $request->getBodyParam('slackWebhookUrl', ''));
+        $settings->webhookUrl = trim((string) $request->getBodyParam('webhookUrl', ''));
+        $settings->webhookSecret = trim((string) $request->getBodyParam('webhookSecret', ''));
+        $settings->excludedFields = (string) $request->getBodyParam('excludedFields', '');
+
+        // Blank means "use Appleseed's own", stored as null.
+        foreach (['navLabel', 'navIcon', 'navIconSvg'] as $attribute) {
+            $value = trim((string) $request->getBodyParam($attribute, ''));
+            $settings->$attribute = $value !== '' ? $value : null;
+        }
 
         if (!$settings->validate()) {
             Craft::$app->getSession()->setError(Craft::t('appleseed', 'Couldn’t save settings.'));

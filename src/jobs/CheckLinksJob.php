@@ -2,11 +2,14 @@
 
 namespace justinholtweb\appleseed\jobs;
 
-use craft\helpers\Db;
+use Craft;
 use craft\queue\BaseJob;
 use justinholtweb\appleseed\Plugin;
 use justinholtweb\appleseed\records\LinkRecord;
 
+/**
+ * Re-checks individual links outside of a scan.
+ */
 class CheckLinksJob extends BaseJob
 {
     /** @var int[] Link IDs to re-check */
@@ -14,32 +17,21 @@ class CheckLinksJob extends BaseJob
 
     public function execute($queue): void
     {
-        $plugin = Plugin::getInstance();
+        $scanner = Plugin::getInstance()->scanner;
         $total = count($this->linkIds);
 
-        foreach ($this->linkIds as $i => $linkId) {
+        foreach (array_values($this->linkIds) as $i => $linkId) {
             $linkRecord = LinkRecord::findOne($linkId);
-            if (!$linkRecord) {
-                continue;
+            if ($linkRecord && !$linkRecord->isIgnored) {
+                $scanner->checkLink($linkRecord);
             }
 
-            $result = $plugin->linkChecker->checkUrl($linkRecord->url);
-
-            $linkRecord->statusCode = $result->statusCode;
-            $linkRecord->status = $result->status;
-            $linkRecord->redirectUrl = $result->redirectUrl;
-            $linkRecord->redirectChain = $result->redirectChain ? json_encode($result->redirectChain) : null;
-            $linkRecord->errorMessage = $result->errorMessage;
-            $linkRecord->lastCheckedAt = Db::prepareDateForDb(new \DateTime());
-            $linkRecord->save(false);
-
-            $this->setProgress($queue, ($i + 1) / max(1, $total), "Checked {$linkId}");
+            $this->setProgress($queue, ($i + 1) / max(1, $total), Craft::t('appleseed', 'Checked {num} of {total}', ['num' => $i + 1, 'total' => $total]));
         }
     }
 
     protected function defaultDescription(): ?string
     {
-        $count = count($this->linkIds);
-        return "Appleseed: Re-checking {$count} link(s)";
+        return Craft::t('appleseed', 'Appleseed: Re-checking {count, plural, =1{# link} other{# links}}', ['count' => count($this->linkIds)]);
     }
 }

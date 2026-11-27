@@ -1,0 +1,39 @@
+<div class="appleseed-widget">
+    <div class="appleseed-widget__counts">
+        <a href="{{ cpUrl('appleseed/dashboard', { status: 'broken', siteId: siteId }) }}" class="appleseed-widget__count appleseed-widget__count--broken">
+            <strong>{{ summary.broken }}</strong>
+            <span>{{ 'Broken'|t('appleseed') }}</span>
+        </a>
+        <a href="{{ cpUrl('appleseed/dashboard', { status: 'redirect', siteId: siteId }) }}" class="appleseed-widget__count">
+            <strong>{{ summary.redirects }}</strong>
+            <span>{{ 'Redirects'|t('appleseed') }}</span>
+        </a>
+        <a href="{{ cpUrl('appleseed/dashboard', { status: '', siteId: siteId }) }}" class="appleseed-widget__count">
+            <strong>{{ summary.total }}</strong>
+            <span>{{ 'Links'|t('appleseed') }}</span>
+        </a>
+    </div>
+
+    {% if links|length %}
+        <ul class="appleseed-widget__list">
+            {% for link in links %}
+                {% set source = link.sources|first %}
+                <li>
+                    <a href="{{ cpUrl('appleseed/dashboard/detail/' ~ link.id) }}" title="{{ link.url }}">{{ link.url }}</a>
+                    <div class="light smalltext">
+                        {{ link.statusCode ?? link.status|replace({'_': ' '})|title }}
+                        {%- if source and source.entryTitle ?? null %} · {{ source.entryTitle }}{% endif %}
+                    </div>
+                </li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+
+    <p class="light smalltext">
+        {% if lastScan %}
+            {{ 'Last scanned {date}.'|t('appleseed', { date: lastScan.completedAt|timestamp('short') }) }}
+        {% else %}
+            {{ 'No scan has finished yet.'|t('appleseed') }}
+        {% endif %}
+    </p>
+</div>

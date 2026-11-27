@@ -8,14 +8,20 @@ use craft\db\ActiveRecord;
  * @property int $id
  * @property string $url
  * @property string $urlHash
+ * @property string|null $host
  * @property int|null $statusCode
  * @property string $status
  * @property string|null $redirectUrl
  * @property string|null $redirectChain
  * @property string|null $errorMessage
  * @property string|null $lastCheckedAt
+ * @property string|null $firstBrokenAt
  * @property int|null $lastScanId
  * @property bool $isIgnored
+ * @property int|null $ignoredById
+ * @property string|null $dateIgnored
+ * @property string $dateCreated
+ * @property string $dateUpdated
  */
 class LinkRecord extends ActiveRecord
 {

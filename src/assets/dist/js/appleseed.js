@@ -3,23 +3,46 @@
 
     document.addEventListener('DOMContentLoaded', function () {
 
-    // Run Full Scan button
-    var runScanBtn = document.getElementById('appleseed-run-scan');
-    if (runScanBtn) {
-        runScanBtn.addEventListener('click', function () {
-            runScanBtn.disabled = true;
-            runScanBtn.textContent = 'Starting...';
+    function errorMessage(error, fallback) {
+        return (error && error.response && error.response.data && error.response.data.message) || fallback;
+    }
 
-            Craft.sendActionRequest('POST', 'appleseed/dashboard/run-scan')
+    // Scan buttons: full, changed entries, re-check broken
+    document.querySelectorAll('.appleseed-run-scan-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var label = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = Craft.t('appleseed', 'Starting…');
+
+            Craft.sendActionRequest('POST', 'appleseed/dashboard/run-scan', {
+                data: { type: btn.dataset.type || 'full' }
+            })
                 .then(function () {
-                    runScanBtn.textContent = 'Scan Queued';
+                    btn.textContent = Craft.t('appleseed', 'Scan Queued');
                     startProgressPolling();
                 })
                 .catch(function (error) {
-                    runScanBtn.disabled = false;
-                    runScanBtn.textContent = 'Run Full Scan';
-                    Craft.cp.displayError('Failed to start scan');
-                    console.error('Appleseed scan error:', error);
+                    btn.disabled = false;
+                    btn.textContent = label;
+                    Craft.cp.displayError(errorMessage(error, Craft.t('appleseed', 'Failed to start scan')));
+                });
+        });
+    });
+
+    // Cancel the running scan
+    var cancelBtn = document.getElementById('appleseed-cancel-scan');
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', function () {
+            cancelBtn.disabled = true;
+
+            Craft.sendActionRequest('POST', 'appleseed/dashboard/cancel-scan')
+                .then(function (response) {
+                    Craft.cp.displayNotice(response.data.message);
+                    window.location.reload();
+                })
+                .catch(function (error) {
+                    cancelBtn.disabled = false;
+                    Craft.cp.displayError(errorMessage(error, Craft.t('appleseed', 'Couldn’t cancel the scan')));
                 });
         });
     }
@@ -86,8 +109,7 @@
                 .catch(function (error) {
                     runSectionScanBtn.disabled = false;
                     runSectionScanBtn.textContent = 'Scan Selected Sections';
-                    Craft.cp.displayError('Failed to start scan');
-                    console.error('Appleseed scan error:', error);
+                    Craft.cp.displayError(errorMessage(error, 'Failed to start scan'));
                 });
         });
     }
@@ -101,6 +123,12 @@
     function startProgressPolling() {
         if (progressEl) {
             progressEl.classList.remove('hidden');
+        }
+        if (cancelBtn) {
+            cancelBtn.classList.remove('hidden');
+        }
+        if (pollInterval) {
+            return;
         }
 
         pollInterval = setInterval(function () {
@@ -206,14 +234,15 @@
         });
     });
 
-    // The status filter submits on change. Wired here rather than in an inline onchange, so the
-    // markup carries no script and the select is Craft's own.
-    var statusFilter = document.getElementById('appleseed-status-filter');
-    if (statusFilter && statusFilter.form) {
-        statusFilter.addEventListener('change', function () {
-            statusFilter.form.submit();
-        });
-    }
+    // The filters submit on change. Wired here rather than in an inline onchange, so the markup
+    // carries no script and the selects are Craft's own.
+    document.querySelectorAll('select.appleseed-autosubmit, .appleseed-autosubmit select').forEach(function (select) {
+        if (select.form) {
+            select.addEventListener('change', function () {
+                select.form.submit();
+            });
+        }
+    });
 
     // Auto-start polling if a scan is already running
     var scanActive = document.getElementById('appleseed-scan-active');
@@ -222,4 +251,28 @@
     }
 
     }); // end DOMContentLoaded
+
+    // "Check this entry again" in the entry editor's sidebar. Delegated, because the sidebar can
+    // arrive after the page has loaded (element editor slideouts).
+    document.addEventListener('click', function (event) {
+        var btn = event.target.closest ? event.target.closest('.appleseed-entry-scan-btn') : null;
+        if (!btn || btn.disabled) {
+            return;
+        }
+
+        btn.disabled = true;
+
+        Craft.sendActionRequest('POST', 'appleseed/dashboard/scan-entry', {
+            data: { entryId: btn.dataset.entryId, siteId: btn.dataset.siteId }
+        })
+            .then(function (response) {
+                Craft.cp.displayNotice(response.data.message);
+                btn.textContent = Craft.t('appleseed', 'Queued');
+            })
+            .catch(function (error) {
+                btn.disabled = false;
+                var message = error && error.response && error.response.data && error.response.data.message;
+                Craft.cp.displayError(message || Craft.t('appleseed', 'Couldn’t queue the entry scan'));
+            });
+    });
 })();

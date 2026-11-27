@@ -2,8 +2,10 @@
 
 namespace justinholtweb\appleseed\jobs;
 
+use Craft;
 use craft\helpers\Queue;
 use craft\queue\BaseJob;
+use justinholtweb\appleseed\helpers\ScanType;
 use justinholtweb\appleseed\models\Settings;
 use justinholtweb\appleseed\Plugin;
 
@@ -17,7 +19,8 @@ use justinholtweb\appleseed\Plugin;
  */
 class ScanJob extends BaseJob
 {
-    public string $type = 'full';
+    /** @var string One of {@see ScanType::STARTABLE}. Ignored when `sectionIds` is set. */
+    public string $type = ScanType::FULL;
 
     /** @var int[]|null */
     public ?array $sectionIds = null;
@@ -33,11 +36,10 @@ class ScanJob extends BaseJob
         };
 
         if (!empty($this->sectionIds)) {
-            $scan = $plugin->scanner->startScan('section', null, null, $this->sectionIds, $progressCallback);
-        } elseif ($this->type === 'database') {
-            $scan = $plugin->scanner->startScan('database', null, null, null, $progressCallback);
+            $scan = $plugin->scanner->startScan(ScanType::SECTION, null, null, $this->sectionIds, $progressCallback);
         } else {
-            $scan = $plugin->scanner->startScan('full', null, null, null, $progressCallback);
+            $type = in_array($this->type, ScanType::STARTABLE, true) ? $this->type : ScanType::FULL;
+            $scan = $plugin->scanner->startScan($type, null, null, null, $progressCallback);
         }
 
         // Nothing to check — finalize immediately rather than queue an empty batch.
@@ -55,9 +57,14 @@ class ScanJob extends BaseJob
     protected function defaultDescription(): ?string
     {
         if (!empty($this->sectionIds)) {
-            return 'Appleseed: Scanning selected sections for broken links';
+            return Craft::t('appleseed', 'Appleseed: Scanning selected sections for broken links');
         }
 
-        return 'Appleseed: Scanning for broken links';
+        return match ($this->type) {
+            ScanType::INCREMENTAL => Craft::t('appleseed', 'Appleseed: Scanning changed entries for broken links'),
+            ScanType::RECHECK => Craft::t('appleseed', 'Appleseed: Re-checking broken links'),
+            ScanType::DATABASE => Craft::t('appleseed', 'Appleseed: Scanning entry content for broken links'),
+            default => Craft::t('appleseed', 'Appleseed: Scanning for broken links'),
+        };
     }
 }

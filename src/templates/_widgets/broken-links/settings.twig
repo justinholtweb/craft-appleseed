@@ -1,0 +1,24 @@
+{% import '_includes/forms' as forms %}
+
+{{ forms.textField({
+    label: 'Links to list'|t('appleseed'),
+    instructions: 'The most recently broken links. 0 shows just the counts.'|t('appleseed'),
+    id: 'limit',
+    name: 'limit',
+    type: 'number',
+    min: 0,
+    max: 25,
+    size: 3,
+    value: widget.limit,
+    errors: widget.getErrors('limit'),
+}) }}
+
+{% if sites|length %}
+    {{ forms.selectField({
+        label: 'Site'|t('appleseed'),
+        id: 'siteId',
+        name: 'siteId',
+        value: widget.siteId,
+        options: [{ label: 'All sites'|t('appleseed'), value: '' }]|merge(sites|map(s => { label: s.name|t('site'), value: s.id })),
+    }) }}
+{% endif %}
