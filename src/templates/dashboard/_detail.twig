@@ -25,6 +25,10 @@
             {% if link.lastCheckedAt %}
                 <span class="appleseed-detail__checked">Last checked: {{ link.lastCheckedAt|date('M j, Y g:ia') }}</span>
             {% endif %}
+
+            {% if link.firstBrokenAt %}
+                <span class="appleseed-detail__checked">{{ 'Broken since {date}'|t('appleseed', { date: link.firstBrokenAt|date('M j, Y g:ia') }) }}</span>
+            {% endif %}
         </div>
     </div>
 
@@ -52,14 +56,28 @@
         </div>
     {% endif %}
 
-    <div class="appleseed-detail__actions">
-        <button type="button" class="btn submit appleseed-rescan-btn" data-link-id="{{ link.id }}">Re-check Link</button>
-        {% if link.isIgnored %}
-            <button type="button" class="btn appleseed-unignore-btn" data-link-id="{{ link.id }}">Un-ignore</button>
-        {% else %}
-            <button type="button" class="btn appleseed-ignore-btn" data-link-id="{{ link.id }}">Ignore Link</button>
-        {% endif %}
-    </div>
+    {% if link.isIgnored %}
+        <p class="light">
+            {% if link.ignoredBy %}
+                {{ 'Ignored by {name} on {date}.'|t('appleseed', { name: link.ignoredBy.friendlyName, date: link.dateIgnored|date('M j, Y') }) }}
+            {% elseif link.dateIgnored %}
+                {{ 'Ignored on {date}.'|t('appleseed', { date: link.dateIgnored|date('M j, Y') }) }}
+            {% else %}
+                {{ 'Ignored.'|t('appleseed') }}
+            {% endif %}
+        </p>
+    {% endif %}
+
+    {% if currentUser.can('appleseed-runScans') %}
+        <div class="appleseed-detail__actions">
+            <button type="button" class="btn submit appleseed-rescan-btn" data-link-id="{{ link.id }}">Re-check Link</button>
+            {% if link.isIgnored %}
+                <button type="button" class="btn appleseed-unignore-btn" data-link-id="{{ link.id }}">Un-ignore</button>
+            {% else %}
+                <button type="button" class="btn appleseed-ignore-btn" data-link-id="{{ link.id }}">Ignore Link</button>
+            {% endif %}
+        </div>
+    {% endif %}
 
     <hr>
 

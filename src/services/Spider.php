@@ -11,6 +11,7 @@ use GuzzleHttp\Exception\GuzzleException;
 use GuzzleHttp\RequestOptions;
 use justinholtweb\appleseed\helpers\Honeypot;
 use justinholtweb\appleseed\helpers\LinkText;
+use justinholtweb\appleseed\helpers\LinkUrl;
 use justinholtweb\appleseed\models\Settings;
 use justinholtweb\appleseed\Plugin;
 
@@ -216,12 +217,12 @@ class Spider extends Component
 
         // Already absolute
         if (preg_match('/^https?:\/\//i', $url)) {
-            return $this->_stripFragment($url);
+            return $this->_stripFragment(LinkUrl::stripCredentials($url));
         }
 
         // Protocol-relative
         if (str_starts_with($url, '//')) {
-            return $this->_stripFragment('https:' . $url);
+            return $this->_stripFragment(LinkUrl::stripCredentials('https:' . $url));
         }
 
         // Resolve relative URL

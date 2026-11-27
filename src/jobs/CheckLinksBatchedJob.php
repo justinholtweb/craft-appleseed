@@ -9,6 +9,7 @@ use craft\queue\BaseBatchedJob;
 use justinholtweb\appleseed\Plugin;
 use justinholtweb\appleseed\records\LinkRecord;
 use justinholtweb\appleseed\records\ScanRecord;
+use justinholtweb\appleseed\services\Scanner;
 
 /**
  * Checks the links discovered by a scan in batches.
@@ -36,7 +37,9 @@ class CheckLinksBatchedJob extends BaseBatchedJob
     protected function processItem(mixed $item): void
     {
         $scan = $this->_getScan();
-        if (!$scan) {
+
+        // Cancelled (or abandoned and failed): skip the rest without touching the network
+        if (!$scan || $scan->status !== Scanner::STATUS_RUNNING) {
             return;
         }
 
@@ -47,7 +50,7 @@ class CheckLinksBatchedJob extends BaseBatchedJob
     protected function afterBatch(): void
     {
         $scan = $this->_getScan();
-        if ($scan) {
+        if ($scan && $scan->status === Scanner::STATUS_RUNNING) {
             Plugin::getInstance()->scanner->updateScanProgress($scan);
         }
     }

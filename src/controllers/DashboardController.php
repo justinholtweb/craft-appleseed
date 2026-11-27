@@ -4,8 +4,7 @@ namespace justinholtweb\appleseed\controllers;
 
 use Craft;
 use craft\web\Controller;
-use justinholtweb\appleseed\jobs\CheckLinksJob;
-use justinholtweb\appleseed\jobs\ScanJob;
+use justinholtweb\appleseed\helpers\ScanType;
 use justinholtweb\appleseed\models\Settings;
 use justinholtweb\appleseed\Plugin;
 use justinholtweb\appleseed\records\LinkRecord;
@@ -20,7 +19,7 @@ class DashboardController extends Controller
             return false;
         }
 
-        $this->requirePermission('appleseed-viewDashboard');
+        $this->requirePermission(Plugin::PERMISSION_VIEW);
 
         return true;
     }
@@ -31,7 +30,8 @@ class DashboardController extends Controller
     public function actionIndex(): Response
     {
         $plugin = Plugin::getInstance();
-        $summary = $plugin->reporting->getDashboardSummary();
+        $summarySiteId = (int)Craft::$app->getRequest()->getQueryParam('siteId') ?: null;
+        $summary = $plugin->reporting->getDashboardSummary($summarySiteId);
         $lastScan = $plugin->reporting->getLastCompletedScan();
         $runningScan = $plugin->reporting->getRunningScan();
 
@@ -46,7 +46,8 @@ class DashboardController extends Controller
         $sort = Craft::$app->getRequest()->getQueryParam('sort', 'status');
         $direction = Craft::$app->getRequest()->getQueryParam('direction', 'asc');
 
-        $results = $plugin->reporting->getLinkResults($statusFilter, $search, $page, 50, $sort, $direction);
+        $filters = $this->_extraFilters();
+        $results = $plugin->reporting->getLinkResults($statusFilter, $search, $page, 50, $sort, $direction, $filters);
 
         // Group sections by type for scan scope picker
         $sectionsByType = $this->_getSectionsByType();
@@ -63,6 +64,13 @@ class DashboardController extends Controller
             'page' => $page,
             'sectionsByType' => $sectionsByType,
             'statusOptions' => $settings->getStatusFilterOptions(),
+            'host' => $filters['host'] ?? null,
+            'siteId' => $filters['siteId'] ?? null,
+            'hosts' => $plugin->reporting->getHosts(),
+            'sites' => Craft::$app->getIsMultiSite() ? Craft::$app->getSites()->getAllSites() : [],
+            'worstHosts' => $plugin->reporting->getWorstHosts(5, $filters['siteId'] ?? null),
+            'worstEntries' => $plugin->reporting->getWorstEntries(5, $filters['siteId'] ?? null),
+            'canScan' => Craft::$app->getUser()->checkPermission(Plugin::PERMISSION_SCAN),
         ]);
     }
 
@@ -106,24 +114,74 @@ class DashboardController extends Controller
     }
 
     /**
-     * Start a scan (AJAX). Optionally scoped to specific sections.
+     * Start a scan (AJAX): `type` (full, database, incremental or recheck), optionally limited
+     * to `sectionIds`.
      */
     public function actionRunScan(): Response
     {
-        $this->requirePermission('appleseed-runScans');
+        $this->requirePermission(Plugin::PERMISSION_SCAN);
         $this->requirePostRequest();
         $this->requireAcceptsJson();
 
-        $sectionIds = Craft::$app->getRequest()->getBodyParam('sectionIds');
+        $request = Craft::$app->getRequest();
+        $type = (string)$request->getBodyParam('type', ScanType::FULL);
+        $sectionIds = $request->getBodyParam('sectionIds');
 
-        $job = new ScanJob();
-        if (!empty($sectionIds) && is_array($sectionIds)) {
-            $job->sectionIds = array_map('intval', $sectionIds);
+        if (!in_array($type, ScanType::STARTABLE, true)) {
+            return $this->asFailure(Craft::t('appleseed', 'Unknown scan type.'));
         }
 
-        Craft::$app->getQueue()->push($job);
+        $queued = Plugin::getInstance()->scanner->queueScan(
+            $type,
+            !empty($sectionIds) && is_array($sectionIds) ? array_map('intval', $sectionIds) : null,
+        );
+
+        if (!$queued) {
+            return $this->asFailure(Craft::t('appleseed', 'A scan is already running.'));
+        }
 
         return $this->asJson(['success' => true, 'message' => Craft::t('appleseed', 'Scan queued.')]);
+    }
+
+    /**
+     * Stop the running scan (AJAX).
+     */
+    public function actionCancelScan(): Response
+    {
+        $this->requirePermission(Plugin::PERMISSION_SCAN);
+        $this->requirePostRequest();
+        $this->requireAcceptsJson();
+
+        $cancelled = Plugin::getInstance()->scanner->cancelRunningScans();
+
+        return $this->asJson([
+            'success' => true,
+            'cancelled' => $cancelled,
+            'message' => $cancelled ? Craft::t('appleseed', 'Scan cancelled.') : Craft::t('appleseed', 'No scan was running.'),
+        ]);
+    }
+
+    /**
+     * Queue a scan of one entry (AJAX), from the entry editor's sidebar.
+     */
+    public function actionScanEntry(): Response
+    {
+        $this->requirePermission(Plugin::PERMISSION_SCAN);
+        $this->requirePostRequest();
+        $this->requireAcceptsJson();
+
+        $request = Craft::$app->getRequest();
+        $entryId = (int)$request->getRequiredBodyParam('entryId');
+        $siteId = (int)$request->getBodyParam('siteId') ?: null;
+
+        $entry = \craft\elements\Entry::find()->id($entryId)->siteId($siteId ?? '*')->status(null)->one();
+        if (!$entry || !$entry->canView(Craft::$app->getUser()->getIdentity())) {
+            throw new NotFoundHttpException(Craft::t('appleseed', 'Entry not found.'));
+        }
+
+        Plugin::getInstance()->scanner->queueEntryScan($entryId, $siteId);
+
+        return $this->asJson(['success' => true, 'message' => Craft::t('appleseed', 'Entry scan queued. Reload the entry once the queue has run it.')]);
     }
 
     /**
@@ -141,6 +199,8 @@ class DashboardController extends Controller
                 'running' => false,
                 'lastScan' => $lastScan ? [
                     'id' => $lastScan->id,
+                    'type' => $lastScan->type,
+                    'newBrokenCount' => $lastScan->newBrokenCount,
                     'status' => $lastScan->status,
                     'totalLinksFound' => $lastScan->totalLinksFound,
                     'totalLinksChecked' => $lastScan->totalLinksChecked,
@@ -170,7 +230,7 @@ class DashboardController extends Controller
      */
     public function actionIgnoreLink(): Response
     {
-        $this->requirePermission('appleseed-runScans');
+        $this->requirePermission(Plugin::PERMISSION_SCAN);
         $this->requirePostRequest();
         $this->requireAcceptsJson();
 
@@ -181,9 +241,7 @@ class DashboardController extends Controller
             return $this->asJson(['success' => false, 'message' => Craft::t('appleseed', 'Link not found.')]);
         }
 
-        $linkRecord->isIgnored = true;
-        $linkRecord->status = 'ignored';
-        $linkRecord->save(false);
+        Plugin::getInstance()->scanner->ignoreLink($linkRecord, Craft::$app->getUser()->getIdentity());
 
         return $this->asJson(['success' => true]);
     }
@@ -193,7 +251,7 @@ class DashboardController extends Controller
      */
     public function actionUnignoreLink(): Response
     {
-        $this->requirePermission('appleseed-runScans');
+        $this->requirePermission(Plugin::PERMISSION_SCAN);
         $this->requirePostRequest();
         $this->requireAcceptsJson();
 
@@ -204,9 +262,7 @@ class DashboardController extends Controller
             return $this->asJson(['success' => false, 'message' => Craft::t('appleseed', 'Link not found.')]);
         }
 
-        $linkRecord->isIgnored = false;
-        $linkRecord->status = 'unknown';
-        $linkRecord->save(false);
+        Plugin::getInstance()->scanner->unignoreLink($linkRecord);
 
         return $this->asJson(['success' => true]);
     }
@@ -216,15 +272,13 @@ class DashboardController extends Controller
      */
     public function actionRescanLink(): Response
     {
-        $this->requirePermission('appleseed-runScans');
+        $this->requirePermission(Plugin::PERMISSION_SCAN);
         $this->requirePostRequest();
         $this->requireAcceptsJson();
 
         $linkId = (int) Craft::$app->getRequest()->getRequiredBodyParam('linkId');
 
-        Craft::$app->getQueue()->push(new CheckLinksJob([
-            'linkIds' => [$linkId],
-        ]));
+        Plugin::getInstance()->scanner->queueLinkChecks([$linkId]);
 
         return $this->asJson(['success' => true, 'message' => Craft::t('appleseed', 'Re-check queued.')]);
     }
@@ -234,10 +288,10 @@ class DashboardController extends Controller
      */
     public function actionExportCsv(): Response
     {
-        $this->requirePermission('appleseed-viewDashboard');
-
-        $statusFilter = Craft::$app->getRequest()->getQueryParam('status');
-        $csv = Plugin::getInstance()->reporting->generateCsv($statusFilter);
+        $request = Craft::$app->getRequest();
+        $statusFilter = $request->getQueryParam('status');
+        $filters = $this->_extraFilters() + ['search' => $request->getQueryParam('search')];
+        $csv = Plugin::getInstance()->reporting->generateCsv($statusFilter, $filters);
 
         $response = Craft::$app->getResponse();
         $response->headers->set('Content-Type', 'text/csv; charset=utf-8');
@@ -245,6 +299,29 @@ class DashboardController extends Controller
         $response->content = $csv;
 
         return $response;
+    }
+
+    /**
+     * The host and site filters from the query string.
+     *
+     * @return array{host?: string, siteId?: int}
+     */
+    private function _extraFilters(): array
+    {
+        $request = Craft::$app->getRequest();
+        $filters = [];
+
+        $host = trim((string)$request->getQueryParam('host', ''));
+        if ($host !== '') {
+            $filters['host'] = $host;
+        }
+
+        $siteId = (int)$request->getQueryParam('siteId');
+        if ($siteId && Craft::$app->getSites()->getSiteById($siteId)) {
+            $filters['siteId'] = $siteId;
+        }
+
+        return $filters;
     }
 
     /**

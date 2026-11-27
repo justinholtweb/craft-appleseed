@@ -24,7 +24,7 @@ class ScanResult
 
     public function isBroken(): bool
     {
-        return in_array($this->status, ['broken', 'dns_error', 'timeout', 'server_error'], true);
+        return \justinholtweb\appleseed\helpers\LinkStatus::isBroken($this->status);
     }
 
     public function isRedirect(): bool

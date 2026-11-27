@@ -422,3 +422,125 @@
     display: flex;
     gap: 8px;
 }
+
+.appleseed-card--blocked .appleseed-card__number { color: var(--medium-text-color); }
+
+/* Where to start */
+.appleseed-hotspots {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.appleseed-hotspots__panel {
+    border: 1px solid var(--hairline-color);
+    border-radius: 8px;
+    padding: 14px 18px;
+}
+
+.appleseed-hotspots__panel h3 {
+    margin: 0 0 8px;
+    font-size: 14px;
+}
+
+.appleseed-hotspots__panel ol {
+    margin: 0;
+    padding-inline-start: 20px;
+    list-style: decimal;
+}
+
+.appleseed-hotspots__panel li {
+    margin: 2px 0;
+    overflow-wrap: anywhere;
+}
+
+.appleseed-hotspots__panel .light {
+    margin-inline-start: 6px;
+    font-size: 12px;
+}
+
+.appleseed-filters__row select {
+    max-width: 220px;
+}
+
+/* Entry editor sidebar */
+.appleseed-entry-panel .meta {
+    padding-block: 12px;
+}
+
+.appleseed-entry-panel__list {
+    margin: 8px 0 12px;
+    padding: 0;
+    list-style: none;
+}
+
+.appleseed-entry-panel__list li {
+    margin-bottom: 8px;
+}
+
+.appleseed-entry-panel__url {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-top: 2px;
+}
+
+/* Dashboard widget */
+.appleseed-widget__counts {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.appleseed-widget__count {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px 4px;
+    border: 1px solid var(--hairline-color);
+    border-radius: 6px;
+    color: var(--text-color);
+    text-decoration: none;
+}
+
+.appleseed-widget__count:hover {
+    text-decoration: none;
+    border-color: var(--medium-hairline-color);
+}
+
+.appleseed-widget__count strong {
+    font-size: 22px;
+    line-height: 1.1;
+}
+
+.appleseed-widget__count span {
+    font-size: 11px;
+    color: var(--light-text-color);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.appleseed-widget__count--broken strong {
+    color: var(--red-600);
+}
+
+.appleseed-widget__list {
+    margin: 0 0 8px;
+    padding: 0;
+    list-style: none;
+}
+
+.appleseed-widget__list li {
+    padding: 6px 0;
+    border-bottom: 1px solid var(--hairline-color);
+}
+
+.appleseed-widget__list a {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}

@@ -1,0 +1,36 @@
+{# The Appleseed panel in the entry editor's sidebar. #}
+{% set problems = links|filter(l => not l.isIgnored and l.status in ['broken', 'dns_error', 'timeout', 'server_error', 'redirect', 'blocked']) %}
+{% set brokenCount = problems|filter(l => l.status in ['broken', 'dns_error', 'timeout', 'server_error'])|length %}
+
+<fieldset class="appleseed-entry-panel" data-entry-id="{{ entryId }}" data-site-id="{{ siteId }}">
+    <legend class="h6">{{ 'Links'|t('appleseed') }}</legend>
+    <div class="meta">
+        {% if links is empty %}
+            <p class="light">{{ 'Appleseed hasn’t found links in this entry yet. They’re read on the next scan.'|t('appleseed') }}</p>
+        {% elseif problems is empty %}
+            <p>{{ '{count, plural, =1{# link} other{# links}}, none broken.'|t('appleseed', { count: links|length }) }}</p>
+        {% else %}
+            <p>
+                {% if brokenCount %}
+                    <span class="appleseed-status appleseed-status--broken">{{ '{count, plural, =1{# broken link} other{# broken links}}'|t('appleseed', { count: brokenCount }) }}</span>
+                {% endif %}
+                <span class="light">{{ 'of {count, plural, =1{# link} other{# links}}'|t('appleseed', { count: links|length }) }}</span>
+            </p>
+            <ul class="appleseed-entry-panel__list">
+                {% for link in problems %}
+                    <li>
+                        <span class="appleseed-status appleseed-status--{{ link.status }}">{{ link.statusCode ?? link.status|replace({'_': ' '})|title }}</span>
+                        <a href="{{ cpUrl('appleseed/dashboard/detail/' ~ link.id) }}" class="appleseed-entry-panel__url" title="{{ link.url }}">{{ link.url }}</a>
+                        {% if link.fields %}
+                            <div class="light smalltext">{{ link.fields|join(', ') }}{% if link.linkText %} · “{{ link.linkText }}”{% endif %}</div>
+                        {% endif %}
+                    </li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+
+        {% if canScan %}
+            <button type="button" class="btn small appleseed-entry-scan-btn" data-entry-id="{{ entryId }}" data-site-id="{{ siteId }}">{{ 'Check this entry again'|t('appleseed') }}</button>
+        {% endif %}
+    </div>
+</fieldset>

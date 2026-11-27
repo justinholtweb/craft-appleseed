@@ -30,14 +30,57 @@
         <div class="appleseed-card__number">{{ summary.working }}</div>
         <div class="appleseed-card__label">Working</div>
     </div>
+    {% if summary.blocked %}
+        <div class="appleseed-card appleseed-card--blocked">
+            <div class="appleseed-card__number">{{ summary.blocked }}</div>
+            <div class="appleseed-card__label">{{ 'Blocked'|t('appleseed') }}</div>
+        </div>
+    {% endif %}
 </div>
+
+{# Where to start: the hosts and entries whose fixes clear the most broken links #}
+{% if worstHosts|length or worstEntries|length %}
+<div class="appleseed-hotspots">
+    {% if worstEntries|length %}
+        <div class="appleseed-hotspots__panel">
+            <h3>{{ 'Entries with the most broken links'|t('appleseed') }}</h3>
+            <ol>
+                {% for e in worstEntries %}
+                    <li>
+                        {% if e.cpUrl %}<a href="{{ e.cpUrl }}">{{ e.title ?? ('Entry #' ~ e.entryId) }}</a>{% else %}{{ 'Entry #' ~ e.entryId }}{% endif %}
+                        <span class="light">{{ '{count, plural, =1{# broken} other{# broken}}'|t('appleseed', { count: e.broken }) }}</span>
+                    </li>
+                {% endfor %}
+            </ol>
+        </div>
+    {% endif %}
+    {% if worstHosts|length %}
+        <div class="appleseed-hotspots__panel">
+            <h3>{{ 'Hosts with the most broken links'|t('appleseed') }}</h3>
+            <ol>
+                {% for h in worstHosts %}
+                    <li>
+                        <a href="{{ cpUrl('appleseed/dashboard', { status: 'broken', host: h.host, siteId: siteId }) }}">{{ h.host }}</a>
+                        <span class="light">{{ '{count, plural, =1{# broken} other{# broken}}'|t('appleseed', { count: h.broken }) }}</span>
+                    </li>
+                {% endfor %}
+            </ol>
+        </div>
+    {% endif %}
+</div>
+{% endif %}
 
 {# Scan Controls #}
 <div class="appleseed-controls">
     <div class="appleseed-controls__left">
-        <button type="button" class="btn submit" id="appleseed-run-scan">Run Full Scan</button>
-        <button type="button" class="btn" id="appleseed-scan-sections-toggle">Scan Sections...</button>
-        <a href="{{ actionUrl('appleseed/dashboard/export-csv', { status: statusFilter }) }}" class="btn">Export CSV</a>
+        {% if canScan %}
+            <button type="button" class="btn submit appleseed-run-scan-btn" id="appleseed-run-scan" data-type="full">{{ 'Run Full Scan'|t('appleseed') }}</button>
+            <button type="button" class="btn appleseed-run-scan-btn" data-type="incremental" title="{{ 'Read only the entries changed since the last scan'|t('appleseed') }}">{{ 'Scan Changed Entries'|t('appleseed') }}</button>
+            <button type="button" class="btn appleseed-run-scan-btn" data-type="recheck" title="{{ 'Check the broken links again, without reading any content'|t('appleseed') }}">{{ 'Re-check Broken'|t('appleseed') }}</button>
+            <button type="button" class="btn" id="appleseed-scan-sections-toggle">{{ 'Scan Sections…'|t('appleseed') }}</button>
+            <button type="button" class="btn {{ runningScan ? '' : 'hidden' }}" id="appleseed-cancel-scan">{{ 'Cancel Scan'|t('appleseed') }}</button>
+        {% endif %}
+        <a href="{{ actionUrl('appleseed/dashboard/export-csv', { status: statusFilter, search: search, host: host, siteId: siteId }) }}" class="btn">{{ 'Export CSV'|t('appleseed') }}</a>
     </div>
 
     <div class="appleseed-controls__right">
@@ -45,6 +88,7 @@
             <span class="appleseed-last-scan">
                 Last scan: {{ lastScan.completedAt|date('M j, Y g:ia') }}
                 &mdash; {{ lastScan.brokenCount }} broken
+                {%- if lastScan.newBrokenCount %}, {{ '{count} new'|t('appleseed', { count: lastScan.newBrokenCount }) }}{% endif %}
             </span>
         {% endif %}
     </div>
@@ -103,7 +147,28 @@
                 name: 'status',
                 options: statusOptions,
                 value: statusFilter,
+                class: 'appleseed-autosubmit',
             }) }}
+
+            {% if sites|length %}
+                {{ forms.select({
+                    id: 'appleseed-site-filter',
+                    name: 'siteId',
+                    options: [{ label: 'All sites'|t('appleseed'), value: '' }]|merge(sites|map(s => { label: s.name|t('site'), value: s.id })),
+                    value: siteId,
+                    class: 'appleseed-autosubmit',
+                }) }}
+            {% endif %}
+
+            {% if hosts|length > 1 or host %}
+                {{ forms.select({
+                    id: 'appleseed-host-filter',
+                    name: 'host',
+                    options: [{ label: 'All hosts'|t('appleseed'), value: '' }]|merge((host and host not in hosts ? [host] : [])|merge(hosts)|map(h => { label: h, value: h })),
+                    value: host,
+                    class: 'appleseed-autosubmit',
+                }) }}
+            {% endif %}
 
             <div class="flex-grow texticon search icon clearable">
                 <input type="text" name="search" class="text fullwidth" placeholder="{{ 'Search URLs…'|t('appleseed') }}" value="{{ search }}" autocomplete="off">
@@ -174,8 +239,14 @@
                         <td>{{ link.lastCheckedAt ? link.lastCheckedAt|date('M j g:ia') : 'Never' }}</td>
                         <td class="thin">
                             <div class="appleseed-actions">
-                                <button type="button" class="btn small appleseed-rescan-btn" data-link-id="{{ link.id }}" title="Re-check">↻</button>
-                                <button type="button" class="btn small appleseed-ignore-btn" data-link-id="{{ link.id }}" title="Ignore">✕</button>
+                                {% if canScan %}
+                                    <button type="button" class="btn small appleseed-rescan-btn" data-link-id="{{ link.id }}" title="{{ 'Re-check'|t('appleseed') }}" aria-label="{{ 'Re-check'|t('appleseed') }}">↻</button>
+                                    {% if link.isIgnored %}
+                                        <button type="button" class="btn small appleseed-unignore-btn" data-link-id="{{ link.id }}" title="{{ 'Stop ignoring'|t('appleseed') }}" aria-label="{{ 'Stop ignoring'|t('appleseed') }}">↺</button>
+                                    {% else %}
+                                        <button type="button" class="btn small appleseed-ignore-btn" data-link-id="{{ link.id }}" title="{{ 'Ignore'|t('appleseed') }}" aria-label="{{ 'Ignore'|t('appleseed') }}">✕</button>
+                                    {% endif %}
+                                {% endif %}
                             </div>
                         </td>
                     </tr>
@@ -187,7 +258,7 @@
     {# Pagination -- only the first, last, and pages either side of the current one,
        so the pager stays usable when a scan turns up thousands of links #}
     {% if results.totalPages > 1 %}
-        {% set pageParams = { status: statusFilter, search: search, sort: sort, direction: direction } %}
+        {% set pageParams = { status: statusFilter, search: search, sort: sort, direction: direction, host: host, siteId: siteId } %}
         {% set window = 2 %}
         {% set windowStart = max(2, page - window) %}
         {% set windowEnd = min(results.totalPages - 1, page + window) %}
@@ -227,7 +298,7 @@
     {% endif %}
 {% else %}
     <div class="zilch">
-        {% if statusFilter or search %}
+        {% if statusFilter or search or host or siteId %}
             No links match your filters.
         {% else %}
             No links found yet. Run a scan to discover links across your site.

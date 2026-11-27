@@ -126,6 +126,20 @@
     disabled: readOnly,
 }) }}
 
+{{ forms.selectField({
+    label: 'Scheduled Scan Type'|t('appleseed'),
+    instructions: 'What a scheduled scan reads. “Changed entries” only reads entries updated since the last scan, which is much faster on a large site; run a full scan now and then to catch links that broke on their own.'|t('appleseed'),
+    id: 'scheduledScanType',
+    name: 'scheduledScanType',
+    value: settings.scheduledScanType,
+    options: [
+        { label: 'Full scan'|t('appleseed'), value: 'full' },
+        { label: 'Changed entries'|t('appleseed'), value: 'incremental' },
+    ],
+    errors: settings.getErrors('scheduledScanType'),
+    disabled: readOnly,
+}) }}
+
 {{ forms.lightswitchField({
     label: 'Scan on Entry Save',
     instructions: 'Automatically scan an entry for broken links whenever it is saved.',
@@ -162,6 +176,51 @@
     disabled: readOnly,
 }) }}
 
+{{ forms.lightswitchField({
+    label: 'Only Newly Broken Links'|t('appleseed'),
+    instructions: 'Notify only when links broke since the scan before — not every time a scan finds links that were already broken. The threshold then counts newly broken links.'|t('appleseed'),
+    id: 'notifyOnlyNew',
+    name: 'notifyOnlyNew',
+    on: settings.notifyOnlyNew,
+    disabled: readOnly,
+}) }}
+
+{{ forms.autosuggestField({
+    label: 'Slack Webhook URL'|t('appleseed'),
+    instructions: 'A Slack incoming-webhook URL to post results to, on the same terms as the email. Keep the URL itself in `.env` and enter the environment variable here.'|t('appleseed'),
+    id: 'slackWebhookUrl',
+    name: 'slackWebhookUrl',
+    value: settings.slackWebhookUrl,
+    placeholder: '$APPLESEED_SLACK_WEBHOOK',
+    suggestEnvVars: true,
+    errors: settings.getErrors('slackWebhookUrl'),
+    disabled: readOnly,
+}) }}
+
+{{ forms.autosuggestField({
+    label: 'Scan Webhook URL'|t('appleseed'),
+    instructions: 'Appleseed POSTs a JSON summary here after every completed scan (except scans of a single saved entry): the scan, the totals, and up to 100 broken links. For dashboards, chat tools or CI.'|t('appleseed'),
+    id: 'webhookUrl',
+    name: 'webhookUrl',
+    value: settings.webhookUrl,
+    placeholder: '$APPLESEED_WEBHOOK_URL',
+    suggestEnvVars: true,
+    errors: settings.getErrors('webhookUrl'),
+    disabled: readOnly,
+}) }}
+
+{{ forms.autosuggestField({
+    label: 'Webhook Secret'|t('appleseed'),
+    instructions: 'Optional. Signs each webhook body as `X-Appleseed-Signature: sha256=<HMAC>`. Use an environment variable.'|t('appleseed'),
+    id: 'webhookSecret',
+    name: 'webhookSecret',
+    value: settings.webhookSecret,
+    placeholder: '$APPLESEED_WEBHOOK_SECRET',
+    suggestEnvVars: true,
+    errors: settings.getErrors('webhookSecret'),
+    disabled: readOnly,
+}) }}
+
 {{ forms.autosuggestField({
     label: 'Email Layout Template',
     instructions: 'Optional path to a custom Twig template that wraps the scan report email. The template receives a `content` variable with the report HTML — output it with `{{ content|raw }}`. Leave blank to use the default layout.',
@@ -171,6 +230,21 @@
     suggestEnvVars: true,
     suggestTemplates: true,
     errors: settings.getErrors('emailLayoutTemplate'),
+    disabled: readOnly,
+}) }}
+
+<hr>
+<h2>{{ 'Content'|t('appleseed') }}</h2>
+
+{{ forms.textareaField({
+    label: 'Excluded Fields'|t('appleseed'),
+    instructions: 'Field handles whose links are never collected — fields nobody is going to fix, or that hold links you don’t want checked. One per line, or comma-separated. Applies inside Matrix fields too.'|t('appleseed'),
+    id: 'excludedFields',
+    name: 'excludedFields',
+    value: settings.excludedFields,
+    rows: 3,
+    class: 'code',
+    errors: settings.getErrors('excludedFields'),
     disabled: readOnly,
 }) }}
 
@@ -200,5 +274,44 @@
     value: settings.defaultStatusFilter,
     options: settings.statusFilterOptions,
     errors: settings.getErrors('defaultStatusFilter'),
+    disabled: readOnly,
+}) }}
+
+<hr>
+<h2>{{ 'Control Panel'|t('appleseed') }}</h2>
+
+<p class="light">{{ 'How Appleseed appears in the control panel’s sidebar. An override set in Settings → Control Panel Navigation takes precedence.'|t('appleseed') }}</p>
+
+{{ forms.textField({
+    label: 'Sidebar Label'|t('appleseed'),
+    instructions: 'Leave empty for “Appleseed”.'|t('appleseed'),
+    id: 'navLabel',
+    name: 'navLabel',
+    value: settings.navLabel,
+    placeholder: 'Appleseed',
+    maxlength: 64,
+    errors: settings.getErrors('navLabel'),
+    disabled: readOnly,
+}) }}
+
+{{ forms.iconPickerField({
+    label: 'Sidebar Icon'|t('appleseed'),
+    instructions: 'Leave empty for Appleseed’s own icon.'|t('appleseed'),
+    id: 'navIcon',
+    name: 'navIcon',
+    value: settings.navIcon,
+    errors: settings.getErrors('navIcon'),
+    disabled: readOnly,
+}) }}
+
+{{ forms.textareaField({
+    label: 'Custom SVG Icon'|t('appleseed'),
+    instructions: 'Optional. Paste one `<svg>` element to use instead of the icon above. It’s sanitised every time it’s drawn; a single-colour icon using `currentColor` matches the rest of the sidebar.'|t('appleseed'),
+    id: 'navIconSvg',
+    name: 'navIconSvg',
+    value: settings.navIconSvg,
+    rows: 4,
+    class: 'code',
+    errors: settings.getErrors('navIconSvg'),
     disabled: readOnly,
 }) }}

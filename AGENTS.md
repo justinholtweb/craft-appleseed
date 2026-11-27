@@ -17,11 +17,17 @@ src/
 │   ├── LinkExtractor.php   # Extracts URLs from entry fields (CKEditor, Link, URL, Matrix, Table)
 │   ├── Spider.php          # BFS crawl of rendered pages
 │   ├── LinkChecker.php     # HEAD/GET with retries, rate limiting, redirect tracking
-│   └── Reporting.php       # Dashboard queries, CSV export, email notifications
-├── jobs/                   # Queue jobs: ScanJob, ScanEntryJob, CheckLinksJob
+│   ├── Reporting.php       # Dashboard/GraphQL/MCP queries (linkQuery + filters), CSV export, email
+│   └── Notifier.php        # After a scan: email, Slack, signed webhook
+├── helpers/                # LinkStatus (statuses + broken list), ScanType, LinkUrl, Presenter, UrlGuard, Honeypot
+├── events/                 # DefineFieldLinksEvent, ScanEvent
+├── gql/                    # GraphQL: GqlAccess (scope check), queries, resolvers, types
+├── mcp/AppleseedTools.php  # MCP tools (Craft 5.12.1+)
+├── widgets/                # BrokenLinksWidget
+├── jobs/                   # Queue jobs: ScanJob, ScanEntryJob, CheckLinksJob, CheckLinksBatchedJob
 ├── controllers/            # CP web controllers: Dashboard (AJAX + views), Settings
-├── console/controllers/    # CLI: craft appleseed/scan, craft appleseed/check-url
-├── templates/              # Twig: dashboard, settings, email
+├── console/controllers/    # CLI: appleseed/scan/*, appleseed/links/*, appleseed/check-url
+├── templates/              # Twig: dashboard, settings, email, _entry-sidebar, _widgets
 └── assets/                 # AssetBundle + CSS/JS for CP dashboard
 ```
 
@@ -41,18 +47,34 @@ Services are registered as Yii2 components in `Plugin::config()` and accessed vi
 
 ### Scan Workflow
 
+Scan types (`helpers/ScanType`): `full`, `database`, `section`, `entry`, `incremental` (entries
+updated since the last completed full/database/incremental scan started), `recheck` (re-tag broken links,
+no discovery).
+
 1. **Create** `ScanRecord` (status=running)
 2. **Discover** links via LinkExtractor (database fields) and/or Spider (HTTP crawl)
-3. **Upsert** into `appleseed_links` (deduped by SHA-256 hash) + `appleseed_link_sources`
-4. **Check** each URL via LinkChecker → update link records
-5. **Finalize** scan stats, send email notification if threshold met
+3. **Store** (`Scanner::_storeLinks`, one transaction): **replace** the sources the scan is authoritative
+   for (all `database` sources for full/database; the read entries' sources otherwise; all `spider`
+   sources when the spider ran), insert links (deduped by SHA-256 hash) and sources, then delete
+   non-ignored links with no sources left. Never append sources — that was the pre-5.3 duplication bug.
+4. **Check** each URL via LinkChecker → `Scanner::applyResult()` (keeps `firstBrokenAt`)
+5. **Finalize** scan stats (incl. `newBrokenCount`), fire `EVENT_AFTER_SCAN`, `Notifier::scanCompleted()`
+   (skips `entry` scans)
+
+Scans can be cancelled (`status=cancelled`; batched jobs skip remaining items). A running scan untouched
+for 2h is marked failed by `Reporting::getRunningScan()`; long phases call `Scanner::touchScan()` —
+a no-change `save()` doesn't bump `dateUpdated`.
+
+Matrix / CKEditor nested entries are read through their owner: sources record the **owner's** entryId
+and a dotted field path (`blocks.body`). Extraction queries use `section('*')` so nested entries aren't
+read twice.
 
 ### Database Tables
 
 | Table | Purpose | Key Columns |
 |-------|---------|-------------|
 | `appleseed_scans` | Scan run metadata | status, type, brokenCount, startedAt/completedAt |
-| `appleseed_links` | Unique URLs + check results | url, urlHash (unique), status, statusCode, redirectUrl |
+| `appleseed_links` | Unique URLs + check results | url, urlHash (unique), host, status, statusCode, redirectUrl, firstBrokenAt, isIgnored, ignoredById, dateIgnored |
 | `appleseed_link_sources` | Where each URL was found | linkId (FK CASCADE), entryId, fieldHandle, sourceType |
 
 URLs are deduped by `urlHash = SHA-256(url)`. One link can have many sources (entries or spidered pages).
@@ -60,6 +82,8 @@ URLs are deduped by `urlHash = SHA-256(url)`. One link can have many sources (en
 ### Link Status Values
 
 `working` · `broken` · `redirect` · `server_error` · `timeout` · `dns_error` · `blocked` · `ignored` · `unknown`
+
+Use `helpers\LinkStatus` (`BROKEN_STATUSES`, `isBroken()`, `condition()`) — never hard-code the list.
 
 `blocked` means bot protection answered instead of the site (Cloudflare challenge, Akamai "Access Denied",
 or a non-standard status like LinkedIn's 999). It is not counted as broken.
@@ -94,6 +118,15 @@ or a non-standard status like LinkedIn's 999). It is not counted as broken.
 | `ignorePatterns` | string | '' | Newline-separated regex patterns; matching URLs are neither checked nor crawled |
 | `userAgent` | string | 'Appleseed Link Checker (Craft CMS)' | HTTP User-Agent header |
 | `defaultStatusFilter` | string | '' | Status the dashboard filters by on first load |
+| `scheduledScanType` | string | full | full / incremental |
+| `notifyOnlyNew` | bool | false | Threshold counts links broken during the scan |
+| `slackWebhookUrl` | ?string | '' | Slack incoming webhook (env var) |
+| `webhookUrl` / `webhookSecret` | ?string | '' | JSON webhook after every scan, HMAC-signed (env vars) |
+| `excludedFields` | string | '' | Field handles whose links aren't collected |
+| `navLabel` / `navIcon` / `navIconSvg` | ?string | null | CP sidebar label and icon |
+
+Env-parsed settings are `?string`: Craft's env parser sets an undefined variable to null during
+validation, which threw on a plain `string`.
 
 ## CP Routes & Permissions
 
@@ -114,7 +147,11 @@ or a non-standard status like LinkedIn's 999). It is not counted as broken.
 | `dashboard/ignore-link` | POST | Set link as ignored (param: `linkId`) |
 | `dashboard/unignore-link` | POST | Un-ignore link (param: `linkId`) |
 | `dashboard/rescan-link` | POST | Queue re-check (param: `linkId`) |
-| `dashboard/export-csv` | GET | Download CSV (param: `status`) |
+| `dashboard/cancel-scan` | POST | Cancel running scans |
+| `dashboard/scan-entry` | POST | Queue an entry scan (params: `entryId`, `siteId`) — entry sidebar |
+| `dashboard/export-csv` | GET | Download CSV (params: `status`, `search`, `host`, `siteId`) |
+
+`dashboard/run-scan` takes `type` (full/database/incremental/recheck) and optional `sectionIds`.
 
 ### Permissions
 
@@ -125,10 +162,26 @@ or a non-standard status like LinkedIn's 999). It is not counted as broken.
 ## Console Commands
 
 ```bash
-craft appleseed/scan                          # Full scan (synchronous, stdout progress)
-craft appleseed/scan/entry --id=123 [--site-id=1]  # Single entry scan
+craft appleseed/scan [--queue]                # Full scan (synchronous, stdout progress)
+craft appleseed/scan/incremental [--queue]    # Entries changed since the last scan
+craft appleseed/scan/recheck-broken [--queue] # Broken links only
+craft appleseed/scan/entry --entry-id=123 [--site-id=1]  # Single entry scan
+craft appleseed/scan/status | cancel | prune --days=90
+craft appleseed/links/export --status=broken [--host=] [--site-id=] [--file=]
+craft appleseed/links/recheck <linkId>
 craft appleseed/check-url https://example.com       # Check one URL, report status
 ```
+
+## GraphQL & MCP
+
+- GraphQL: scope `appleseedLinks:read`; `GqlAccess::canRead()` refuses the public schema. Every resolver
+  re-checks it. `AppleseedLinkSource.entry` goes through Craft's Entry resolver (schema section access).
+- MCP (5.12.1+, `Plugin::mcpAvailable()`): `mcp/AppleseedTools`, registered via
+  `Mcp::EVENT_REGISTER_CAPABILITY_TYPES`. Tool names/output shapes are final and shared with Appleseed 6.
+  Each tool re-checks `accessCp` + the plugin permission through `McpActor`; entry tools also `canView()`.
+  Reach services via `Plugin::getInstance()`, not constructor injection. PHPStan uses
+  `tests/_stubs/mcp.php` because the dev install is Craft 5.10.
+- Both output through `helpers/Presenter` — keep shapes in sync.
 
 ## Event Listeners (Plugin.php)
 
@@ -136,8 +189,12 @@ craft appleseed/check-url https://example.com       # Check one URL, report stat
 |-------|------|--------|
 | `UrlManager::EVENT_REGISTER_CP_URL_RULES` | CP request | Register 4 CP routes |
 | `UserPermissions::EVENT_REGISTER_PERMISSIONS` | Always | Register 3 permissions — never CP-only: Craft drops unknown permission names on save, so a console `project-config/apply` would strip them |
-| `Entry::EVENT_AFTER_SAVE` | Always (if enabled) | Queue `ScanEntryJob` (skips drafts/revisions) |
-| On init (CP only) | CP request | Check if scheduled scan is due, push `ScanJob`. Never cold-starts: skipped until a scan has completed |
+| `Entry::EVENT_AFTER_SAVE` | Always (if enabled) | Queue `ScanEntryJob` (skips drafts/revisions/nested) |
+| `Element::EVENT_DEFINE_SIDEBAR_HTML` (Entry) | CP request | Entry sidebar panel (`_entry-sidebar.twig`) |
+| `Dashboard::EVENT_REGISTER_WIDGET_TYPES` | Always | `BrokenLinksWidget` |
+| `Gql::EVENT_REGISTER_GQL_*` | Always | Types, queries, schema component |
+| `Mcp::EVENT_REGISTER_CAPABILITY_TYPES` | Craft 5.12.1+ | `AppleseedTools` |
+| On init (CP only) | CP request | Check if scheduled scan is due, push `ScanJob` (`scheduledScanType`). Never cold-starts: skipped until a full/database/incremental scan has completed; measured from that, not entry scans |
 
 ## Working With This Codebase
 
@@ -157,10 +214,10 @@ if ($field instanceof YourFieldType) {
 
 ### Adding a new link status
 
-1. Update `ScanResult` helper methods if the new status should be considered broken/working
+1. Add it to `helpers/LinkStatus` (`ALL`, `label()`, and `BROKEN_STATUSES` if it counts as broken)
 2. Add CSS class in `appleseed.css` (`.appleseed-status--yourstatus`)
-3. Update `Reporting::getBrokenLinkCount()` if it should count as broken
-4. Add to filter dropdown in `dashboard/_index.twig`
+3. Add to `Settings::getStatusFilterOptions()` (the dashboard filter)
+4. Check `Reporting::getDashboardSummary()` buckets it, and update the GraphQL/MCP descriptions
 
 ### Honeypots (Black Hole)
 
@@ -210,7 +267,9 @@ class; use `forms.*` macros for controls.
 
 ```sh
 docker exec -w /var/www/html ddev-plugin-testing-web php /var/www/craft-appleseed/tests/integration/security.php  # 23 checks
-docker exec -w /sites/craft-appleseed ddev-phpstan-runner-web bash -c 'vendor/bin/phpstan analyse --memory-limit=1G && vendor/bin/ecs check'
+docker exec -w /var/www/html ddev-plugin-testing-web php /var/www/craft-appleseed/tests/integration/features.php  # 38 checks (GraphQL, MCP, notifications, CP); run a scan first
+docker run --rm -v "$PWD":/app -w /app php:8.3-cli php vendor/bin/phpstan analyse --memory-limit=1G
+docker run --rm -v "$PWD":/app -w /app php:8.3-cli php vendor/bin/ecs check
 ```
 
 ## Testing Checklist
